@@ -66,7 +66,8 @@ function RunForm({
   const [err, setErr] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
 
-  const outputs = stock.filter((s) => s.category === 'finished' || s.category === 'raw')
+  // Only things this company actually makes can be the output of a run.
+  const outputs = stock.filter((s) => s.role === 'wip' || s.role === 'finished')
   const outMat = stock.find((s) => String(s.material_id) === f.output_material_id)
 
   function setInput(i: number, patch: Partial<InputRow>) {

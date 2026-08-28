@@ -41,6 +41,16 @@ export interface Material {
   spec: Record<string, unknown>
 }
 
+/** What an article IS at a given company. The same article can be finished goods at
+ *  one plant and raw material at another — PVC coated wire is exactly that. */
+export type StockRole = 'raw' | 'wip' | 'finished'
+
+export const STOCK_ROLE_LABEL: Record<StockRole, string> = {
+  raw: 'Raw materials & consumables',
+  wip: 'Work in progress',
+  finished: 'Finished goods',
+}
+
 /** One row per (plant, material) pair — there is no single global balance. */
 export interface StockLevel {
   plant_id: number
@@ -50,6 +60,7 @@ export interface StockLevel {
   code: string
   name: string
   category: string
+  role: StockRole
   unit: string
   spec: Record<string, unknown>
   reorder_level: number
@@ -59,6 +70,8 @@ export interface StockLevel {
   total_in: number
   total_out: number
   produced: number
+  consumed: number
+  purchased: number
   received_in: number
   sent_out: number
   last_movement: string | null
