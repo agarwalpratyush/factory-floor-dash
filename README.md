@@ -9,6 +9,8 @@ Shop-floor tracking for two units that feed each other:
 
 Vite + React + TypeScript + Tailwind v4, talking straight to Supabase Postgres.
 
+**Live:** https://agarwalpratyush.github.io/factory-floor-dash/
+
 ## Running it
 
 ```bash
@@ -39,6 +41,36 @@ forms ask you to pick one first.
 | `/transfers` | Saffron → Agarwal movements, with in-transit tracking and receipt confirmation |
 | `/attendance` | Tap-to-mark attendance by department, 30-day summary, daily wage bill |
 | `/dispatch` | Customer dispatches with challan/LR/vehicle/driver and status |
+
+## Deploying
+
+```bash
+npm run deploy
+```
+
+Builds and pushes `dist/` to the `gh-pages` branch, which GitHub Pages serves.
+
+Two things make a single-page app work on Pages. `vite.config.ts` sets
+`base: '/factory-floor-dash/'` so assets resolve under the repo subpath, and the
+router takes its `basename` from `import.meta.env.BASE_URL` to match. Pages has no
+server to rewrite deep links, so `scripts/pages-fixup.mjs` copies `index.html` to
+`404.html` — Pages serves that for any unknown path, the app boots, and the router
+picks up the route. It also writes `.nojekyll`, without which Pages would hide files
+beginning with an underscore.
+
+Hosting somewhere else later needs no code change:
+
+```bash
+BASE_PATH=/ npm run build:pages
+```
+
+The repository is public, because GitHub Pages will not serve a private repo on a
+free plan. That means the built bundle — including the Supabase project URL and
+**publishable** key — is readable by anyone. That is how every browser-side Supabase
+app works, and it is safe only because of the permissions below: verified from the
+live site, an anonymous request with that key returns zero rows from every `ff_`
+table, and `staff` returns `permission denied`. Never put a service-role key in this
+bundle.
 
 ## Data model
 
