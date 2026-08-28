@@ -11,9 +11,12 @@ export type OrderStage =
 export type AttendanceStatus =
   | 'present' | 'absent' | 'half_day' | 'leave' | 'week_off'
 
-export type DispatchStatus = 'loaded' | 'in_transit' | 'delivered' | 'returned'
+export type DispatchStatus =
+  | 'loaded' | 'in_transit' | 'delivered' | 'received' | 'returned' | 'cancelled'
 
-export type TransferStatus = 'dispatched' | 'received' | 'cancelled'
+/** Where a load is going. A customer load is sold and gone; an inter-unit load only
+ *  lands in the other company's stock once someone there confirms it arrived. */
+export type OutwardKind = 'customer' | 'inter_unit'
 
 /** Which production processes a company runs. Held in the database, not in code,
  *  because a company can take on a new one without a code change. */
@@ -182,6 +185,11 @@ export interface DispatchItem {
 export interface Dispatch {
   id: number
   plant_id: number
+  kind: OutwardKind
+  /** Set for inter_unit only: which of our companies is receiving. */
+  to_plant_id: number | null
+  received_date: string | null
+  received_by: string | null
   dispatch_date: string
   order_id: number | null
   challan_no: string | null
@@ -222,21 +230,21 @@ export interface ProductionInput {
   ff_materials?: Pick<Material, 'code' | 'name' | 'unit'>
 }
 
-export interface Transfer {
+/** A row of ff_in_transit: left one of our companies, not yet booked in at the other. */
+export interface InTransit {
   id: number
   transfer_date: string
-  from_plant_id: number
-  to_plant_id: number
-  material_id: number
-  qty: number
-  qty_received: number | null
-  received_date: string | null
   challan_no: string | null
   vehicle_no: string | null
   transporter: string | null
-  status: TransferStatus
-  remarks: string | null
-  ff_materials?: Pick<Material, 'code' | 'name' | 'unit'>
+  from_plant_id: number
+  to_plant_id: number
+  from_plant: string
+  to_plant: string
+  qty: number
+  material_code: string | null
+  unit: string | null
+  days_in_transit: number
 }
 
 export const ORDER_STAGES: OrderStage[] = [

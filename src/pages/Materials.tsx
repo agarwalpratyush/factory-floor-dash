@@ -111,7 +111,7 @@ function EntryForm({
         </button>
       </div>
       <p className="text-xs text-slate-500">
-        For a production run use <strong>Production</strong>; to move stock to the other unit use <strong>Transfers</strong>. Both post their movements automatically.
+        For a production run use <strong>Production</strong>; to send stock to the other company use <strong>Dispatch</strong>. Both post their movements automatically.
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

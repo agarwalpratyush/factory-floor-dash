@@ -10,7 +10,7 @@ import { useAuth } from '../lib/auth'
 import { Badge, Card, Empty, ErrorBox, PlantTag, Spinner, STAGE_TONE, Stat } from '../components/ui'
 import { daysAgo, fmtDate, fmtMoney, fmtQty, today } from '../lib/format'
 import { STAGE_LABEL } from '../lib/types'
-import type { Attendance, DailyLabour, MaterialTxn, OrderProgress, Plant, StockLevel, Transfer, Worker } from '../lib/types'
+import type { Attendance, DailyLabour, InTransit, MaterialTxn, OrderProgress, Plant, StockLevel, Worker } from '../lib/types'
 
 async function loadDashboard(scope: PlantScope) {
   const one = <T extends { eq: (c: string, v: unknown) => T }>(q: T) =>
@@ -26,7 +26,7 @@ async function loadDashboard(scope: PlantScope) {
     scope === 'group'
       ? supabase.from('ff_workers').select('*').eq('active', true)
       : supabase.from('ff_workers').select('*').eq('active', true).eq('plant_id', scope),
-    supabase.from('ff_transfers').select('*, ff_materials(code,name,unit)').eq('status', 'dispatched'),
+    supabase.from('ff_in_transit').select('*'),
     one(supabase.from('ff_daily_labour').select('*').eq('work_date', today())),
   ])
 
@@ -45,7 +45,7 @@ async function loadDashboard(scope: PlantScope) {
       .filter((a) => ids.has(a.worker_id)),
     txns: (txns.data ?? []) as MaterialTxn[],
     workers: wk,
-    transit: (transit.data ?? []) as Transfer[],
+    transit: (transit.data ?? []) as InTransit[],
     labour: (labour.data ?? []) as DailyLabour[],
   }
 }
@@ -205,24 +205,23 @@ export default function Dashboard() {
       {data.transit.length > 0 && (
         <Card
           title="In transit between units"
-          action={<Link to="/transfers" className="text-xs font-medium text-blue-600 hover:underline">Transfers</Link>}
+          action={<Link to="/dispatch" className="text-xs font-medium text-blue-600 hover:underline">Dispatch</Link>}
         >
           <ul className="divide-y divide-slate-100">
-            {data.transit.map((t) => {
-              const daysOut = Math.floor((Date.now() - new Date(t.transfer_date).getTime()) / 86400000)
-              return (
-                <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                  <div>
-                    <span className="font-medium text-slate-900">{t.ff_materials?.code}</span>
-                    <span className="ml-2 text-sm text-slate-600">{fmtQty(t.qty)} {t.ff_materials?.unit}</span>
-                    <span className="ml-2 text-xs text-slate-500">
-                      {byId(t.from_plant_id)?.short_name} → {byId(t.to_plant_id)?.short_name} · {t.vehicle_no ?? '—'}
-                    </span>
-                  </div>
-                  <Badge tone={daysOut > 5 ? 'red' : 'amber'}>{daysOut}d on the road</Badge>
-                </li>
-              )
-            })}
+            {data.transit.map((t) => (
+              <li key={t.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <div>
+                  <span className="font-medium text-slate-900">{t.material_code ?? '—'}</span>
+                  <span className="ml-2 text-sm text-slate-600">{fmtQty(t.qty)} {t.unit}</span>
+                  <span className="ml-2 text-xs text-slate-500">
+                    {t.from_plant} → {t.to_plant} · {t.vehicle_no ?? 'no vehicle'}
+                  </span>
+                </div>
+                <Badge tone={Number(t.days_in_transit) > 5 ? 'red' : 'amber'}>
+                  {t.days_in_transit}d on the road
+                </Badge>
+              </li>
+            ))}
           </ul>
         </Card>
       )}

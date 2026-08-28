@@ -9,7 +9,6 @@ import Orders from './pages/Orders'
 import Production from './pages/Production'
 import Materials from './pages/Materials'
 import Stock from './pages/Stock'
-import Transfers from './pages/Transfers'
 import Attendance from './pages/Attendance'
 import Dispatch from './pages/Dispatch'
 
@@ -46,9 +45,10 @@ function Gate() {
             <Route path="production" element={<Production />} />
             {/* Shift Log folded into Production; keep old links working. */}
             <Route path="shift-log" element={<Navigate to="/production" replace />} />
+            {/* Transfers folded into Dispatch; keep old links working. */}
+            <Route path="transfers" element={<Navigate to="/dispatch" replace />} />
             <Route path="materials" element={<Materials />} />
             <Route path="stock" element={<Stock />} />
-            <Route path="transfers" element={<Transfers />} />
             <Route path="attendance" element={<Attendance />} />
             <Route path="dispatch" element={<Dispatch />} />
           </Route>
