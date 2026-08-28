@@ -14,7 +14,9 @@ export interface Me {
   permissions: Record<string, boolean>
 }
 
-export type Perm = 'ff_view' | 'ff_entry' | 'ff_manage' | 'ff_money'
+export type Perm =
+  | 'ff_view' | 'ff_entry' | 'ff_manage' | 'ff_money'
+  | 'ff_backdate' | 'ff_orders_write'
 
 interface Ctx {
   session: Session | null

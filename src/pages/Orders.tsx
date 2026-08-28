@@ -34,7 +34,7 @@ async function loadDetail(orderId: number) {
   return { items: (items.data ?? []) as OrderItem[], log: (log.data ?? []) as StageLogRow[] }
 }
 
-function OrderDetail({ order, onChanged }: { order: OrderProgress; onChanged: () => void }) {
+function OrderDetail({ order, onChanged, canWrite }: { order: OrderProgress; onChanged: () => void; canWrite: boolean }) {
   const { data, loading, error, refresh } = useQuery(() => loadDetail(order.id), 'detail-' + order.id)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
@@ -76,7 +76,7 @@ function OrderDetail({ order, onChanged }: { order: OrderProgress; onChanged: ()
             {STAGE_LABEL[s]}
           </span>
         ))}
-        {nextStage && order.stage !== 'cancelled' && (
+        {nextStage && order.stage !== 'cancelled' && canWrite && (
           <Button onClick={() => advance(nextStage)} disabled={busy} className="ml-auto">
             Move to {STAGE_LABEL[nextStage]}
           </Button>
@@ -102,24 +102,32 @@ function OrderDetail({ order, onChanged }: { order: OrderProgress; onChanged: ()
                       <td className="py-2 pr-2 text-slate-800">{it.description}</td>
                       <td className="py-2 text-right tabular-nums text-slate-600">{fmtQty(it.qty)} {it.unit}</td>
                       <td className="py-2 text-right">
-                        <input
-                          type="number"
-                          defaultValue={Number(it.qty_produced)}
-                          min={0}
-                          max={Number(it.qty)}
-                          onBlur={(e) => {
-                            const v = Number(e.target.value)
-                            if (v !== Number(it.qty_produced)) setProduced(it, v)
-                          }}
-                          className="w-24 rounded-md border border-slate-300 px-2 py-1 text-right text-sm tabular-nums"
-                        />
+                        {canWrite ? (
+                          <input
+                            type="number"
+                            defaultValue={Number(it.qty_produced)}
+                            min={0}
+                            max={Number(it.qty)}
+                            onBlur={(e) => {
+                              const v = Number(e.target.value)
+                              if (v !== Number(it.qty_produced)) setProduced(it, v)
+                            }}
+                            className="w-24 rounded-md border border-slate-300 px-2 py-1 text-right text-sm tabular-nums"
+                          />
+                        ) : (
+                          <span className="tabular-nums text-slate-800">{fmtQty(it.qty_produced)}</span>
+                        )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            <p className="mt-2 text-xs text-slate-500">Edit a produced figure and click away to save.</p>
+            <p className="mt-2 text-xs text-slate-500">
+              {canWrite
+                ? 'Edit a produced figure and click away to save.'
+                : 'The order book is read-only for your account.'}
+            </p>
           </div>
 
           <div>
@@ -217,7 +225,9 @@ export default function Orders() {
   const { scope, plant, byId } = usePlant()
   const { can } = useAuth()
   const money = can('ff_money')
-  const manage = can('ff_manage')
+  // Taking and changing an order is a commercial decision, held separately from
+  // the shop-floor manage rights.
+  const writeOrders = can('ff_orders_write')
   const { data, loading, error, refresh } = useQuery(() => loadOrders(scope), 'orders-' + scopeKey(scope))
   const [stage, setStage] = useState<string>('open')
   const [q, setQ] = useState('')
@@ -240,7 +250,7 @@ export default function Orders() {
           <h1 className="text-xl font-semibold text-slate-900">Orders</h1>
           <p className="text-sm text-slate-500">{rows.length} shown · {(data ?? []).length} total</p>
         </div>
-        {plant && manage && (
+        {plant && writeOrders && (
           <Button variant={showNew ? 'ghost' : 'primary'} onClick={() => setShowNew((s) => !s)}>
             {showNew ? 'Cancel' : '+ New order'}
           </Button>
@@ -252,7 +262,13 @@ export default function Orders() {
           <NewOrderForm plantId={plant.id} onDone={() => { setShowNew(false); refresh() }} />
         </Card>
       )}
-      {!plant && <NeedPlant what="add an order" />}
+      {!plant && writeOrders && <NeedPlant what="add an order" />}
+      {!writeOrders && (
+        <p className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200">
+          Orders are read-only for your account. Placing an order, moving its stage and
+          recording produced quantities are all done by the owner.
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-2">
         <input
@@ -313,7 +329,7 @@ export default function Orders() {
                     </div>
                   </div>
                 </div>
-                {openId === o.id && <OrderDetail order={o} onChanged={refresh} />}
+                {openId === o.id && <OrderDetail order={o} onChanged={refresh} canWrite={writeOrders} />}
               </Card>
             )
           })}
