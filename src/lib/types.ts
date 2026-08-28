@@ -15,11 +15,16 @@ export type DispatchStatus = 'loaded' | 'in_transit' | 'delivered' | 'returned'
 
 export type TransferStatus = 'dispatched' | 'received' | 'cancelled'
 
+/** Which production processes a company runs. Held in the database, not in code,
+ *  because a company can take on a new one without a code change. */
+export type PlantProcess = 'coating' | 'fabrication'
+
 export interface Plant {
   id: number
   code: string
   name: string
   short_name: string
+  processes: PlantProcess[]
   address: string | null
   city: string | null
   state: string | null

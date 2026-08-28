@@ -118,6 +118,16 @@ export function NeedPlant({ what }: { what: string }) {
   )
 }
 
+/** Shown when a page belongs to a process this company does not run. */
+export function NotHere({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="rounded-xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+      <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
+      <p className="mt-2 max-w-prose text-sm text-slate-600">{children}</p>
+    </div>
+  )
+}
+
 /** Small plant tag for rows in Combined View, where a bare row is ambiguous. */
 export function PlantTag({ code }: { code: string | undefined }) {
   if (!code) return null

@@ -2,13 +2,18 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useState } from 'react'
 import { usePlant } from '../lib/plant'
 import { useAuth, type Perm } from '../lib/auth'
+import type { PlantProcess } from '../lib/types'
 
-/** `need` is the permission that makes a page worth showing at all. */
-const NAV: { to: string; label: string; end?: boolean; need: Perm }[] = [
+/**
+ * `need` is the permission that makes a page worth showing.
+ * `process` limits a page to companies that actually run it — Saffron coats, Agarwal
+ * fabricates. Combined View shows both so the group can read across.
+ */
+const NAV: { to: string; label: string; end?: boolean; need: Perm; process?: PlantProcess }[] = [
   { to: '/', label: 'Dashboard', end: true, need: 'ff_view' },
   { to: '/orders', label: 'Orders', need: 'ff_view' },
-  { to: '/shift-log', label: 'Shift Log', need: 'ff_view' },
-  { to: '/production', label: 'Production', need: 'ff_view' },
+  { to: '/shift-log', label: 'Shift Log', need: 'ff_view', process: 'coating' },
+  { to: '/production', label: 'Production', need: 'ff_view', process: 'fabrication' },
   { to: '/materials', label: 'Materials', need: 'ff_view' },
   { to: '/stock', label: 'Stock', need: 'ff_view' },
   { to: '/transfers', label: 'Transfers', need: 'ff_manage' },
@@ -61,10 +66,10 @@ function PlantSwitcher() {
 
 export default function Layout() {
   const [open, setOpen] = useState(false)
-  const { plant, scope, pinned } = usePlant()
+  const { plant, scope, pinned, runs } = usePlant()
   const { me, can, signOut } = useAuth()
 
-  const nav = NAV.filter((n) => can(n.need))
+  const nav = NAV.filter((n) => can(n.need) && (!n.process || runs(n.process)))
 
   const link = ({ isActive }: { isActive: boolean }) =>
     'block rounded-lg px-3 py-2 text-sm font-medium transition ' +

@@ -4,7 +4,7 @@ import { useQuery } from '../lib/useQuery'
 import { usePlant, scopeKey } from '../lib/plant'
 import {
   Badge, Button, Card, Empty, ErrorBox, Field, inputCls,
-  NeedPlant, PlantTag, Spinner, Stat,
+  NeedPlant, NotHere, PlantTag, Spinner, Stat,
 } from '../components/ui'
 import { daysAgo, fmtDate, fmtQty, today } from '../lib/format'
 import { SHIFTS } from '../lib/types'
@@ -184,7 +184,7 @@ function RunForm({
 }
 
 export default function Production() {
-  const { scope, plant, byId } = usePlant()
+  const { scope, plant, byId, runs: runsProcess } = usePlant()
   const [days, setDays] = useState(30)
   const [showNew, setShowNew] = useState(false)
   const { data, loading, error, refresh } = useQuery(
@@ -206,17 +206,25 @@ export default function Production() {
     return [...m.entries()].sort((a, b) => b[1].runs - a[1].runs)
   }, [runs])
 
+  if (!runsProcess('fabrication')) {
+    return (
+      <NotHere title={(plant?.short_name ?? 'This company') + ' does not fabricate'}>
+        {plant?.short_name ?? 'This company'} only coats wire, so there are no free-form
+        production runs here. Record the coating line on <strong>Shift Log</strong> — it
+        captures every coil and posts the stock movements for you.
+      </NotHere>
+    )
+  }
+
   return (
     <div className="space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Production</h1>
           <p className="text-sm text-slate-500">
-            {plant?.code === 'SAF'
-              ? 'GI wire + PVC granules → PVC coated GI wire.'
-              : plant?.code === 'AGI'
-                ? 'GI wire → DT mesh rolls → gabion boxes.'
-                : 'Runs across both companies.'}
+            {plant
+              ? 'GI wire → DT mesh rolls → gabion boxes.'
+              : 'Runs at both companies. Coating shifts appear here from the Shift Log.'}
           </p>
         </div>
         {plant && (

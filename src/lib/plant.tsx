@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from './supabase'
 import { useAuth } from './auth'
-import type { Plant } from './types'
+import type { Plant, PlantProcess } from './types'
 
 /** 'group' is the Combined View — read-only, since a new record must belong to one company. */
 export type PlantScope = number | 'group'
@@ -18,6 +18,8 @@ interface Ctx {
   loading: boolean
   error: string | null
   byId: (id: number) => Plant | undefined
+  /** True in Combined View, or when the selected company runs this process. */
+  runs: (p: PlantProcess) => boolean
 }
 
 const PlantContext = createContext<Ctx | null>(null)
@@ -76,6 +78,10 @@ export function PlantProvider({ children }: { children: ReactNode }) {
     loading,
     error,
     byId: (id: number) => plants.find((p) => p.id === id),
+    runs: (proc: PlantProcess) => {
+      const sel = scope === 'group' ? null : plants.find((p) => p.id === scope)
+      return sel ? (sel.processes ?? []).includes(proc) : true
+    },
   }), [plants, pinned, scope, loading, error])
 
   return <PlantContext.Provider value={value}>{children}</PlantContext.Provider>

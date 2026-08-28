@@ -4,7 +4,7 @@ import { useQuery } from '../lib/useQuery'
 import { usePlant, scopeKey, type PlantScope } from '../lib/plant'
 import {
   Badge, Button, Card, Empty, ErrorBox, Field, inputCls,
-  NeedPlant, PlantTag, Spinner, Stat,
+  NeedPlant, NotHere, PlantTag, Spinner, Stat,
 } from '../components/ui'
 import { fmtDate, fmtNum, today } from '../lib/format'
 import { SHIFTS } from '../lib/types'
@@ -372,7 +372,7 @@ function EntryGrid({
 }
 
 export default function ShiftLog() {
-  const { scope, plant, byId } = usePlant()
+  const { scope, plant, byId, runs } = usePlant()
   const { data, loading, error, refresh } = useQuery(() => loadLogs(scope), 'shiftlog-' + scopeKey(scope))
   const [showNew, setShowNew] = useState(false)
   const [openId, setOpenId] = useState<number | null>(null)
@@ -385,6 +385,16 @@ export default function ShiftLog() {
     : 0
   const totalGranules = logs.reduce((s, l) => s + Number(l.granules_used), 0)
   const totalCuts = logs.reduce((s, l) => s + Number(l.power_cuts), 0)
+
+  if (!runs('coating')) {
+    return (
+      <NotHere title={(plant?.short_name ?? 'This company') + ' has no coating line'}>
+        The coil register belongs to whichever company coats wire.
+        {' '}{plant?.short_name ?? 'This company'} buys its coated wire in, so record mesh and
+        box making on <strong>Production</strong> instead.
+      </NotHere>
+    )
+  }
 
   return (
     <div className="space-y-5">
