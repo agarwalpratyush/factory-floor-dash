@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from './supabase'
 import { useAuth } from './auth'
-import type { Plant, PlantProcess } from './types'
+import type { Plant, PlantProcess, SupplyRoute } from './types'
 
 /** 'group' is the Combined View — read-only, since a new record must belong to one company. */
 export type PlantScope = number | 'group'
@@ -20,6 +20,8 @@ interface Ctx {
   byId: (id: number) => Plant | undefined
   /** True in Combined View, or when the selected company runs this process. */
   runs: (p: PlantProcess) => boolean
+  /** Companies this one may send material to. Supply runs one way. */
+  sendableTo: (fromPlantId: number) => Plant[]
 }
 
 const PlantContext = createContext<Ctx | null>(null)
@@ -31,12 +33,17 @@ export function PlantProvider({ children }: { children: ReactNode }) {
   // A login pinned to one company never gets the Combined View.
   const pinned = me?.plant_id ?? null
   const [plants, setPlants] = useState<Plant[]>([])
+  const [routes, setRoutes] = useState<SupplyRoute[]>([])
   const [scope, setScopeRaw] = useState<PlantScope>(pinned ?? 'group')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
+    supabase.from('ff_supply_routes').select('*').then(({ data }) => {
+      if (alive) setRoutes((data ?? []) as SupplyRoute[])
+    })
+
     supabase
       .from('ff_plants')
       .select('*')
@@ -78,11 +85,16 @@ export function PlantProvider({ children }: { children: ReactNode }) {
     loading,
     error,
     byId: (id: number) => plants.find((p) => p.id === id),
+    sendableTo: (fromPlantId: number) =>
+      routes
+        .filter((r) => r.from_plant_id === fromPlantId)
+        .map((r) => plants.find((p) => p.id === r.to_plant_id))
+        .filter((p): p is Plant => !!p),
     runs: (proc: PlantProcess) => {
       const sel = scope === 'group' ? null : plants.find((p) => p.id === scope)
       return sel ? (sel.processes ?? []).includes(proc) : true
     },
-  }), [plants, pinned, scope, loading, error])
+  }), [plants, routes, pinned, scope, loading, error])
 
   return <PlantContext.Provider value={value}>{children}</PlantContext.Provider>
 }

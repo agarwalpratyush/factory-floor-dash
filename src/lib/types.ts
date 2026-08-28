@@ -230,6 +230,13 @@ export interface ProductionInput {
   ff_materials?: Pick<Material, 'code' | 'name' | 'unit'>
 }
 
+/** Which of our companies may send material to which. Missing means it never happens. */
+export interface SupplyRoute {
+  from_plant_id: number
+  to_plant_id: number
+  note: string | null
+}
+
 /** A row of ff_in_transit: left one of our companies, not yet booked in at the other. */
 export interface InTransit {
   id: number

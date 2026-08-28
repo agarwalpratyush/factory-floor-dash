@@ -59,16 +59,17 @@ async function loadPage(scope: PlantScope, from: string) {
 }
 
 function OutwardForm({
-  plant, plants, orders, stock, drivers, onDone,
+  plant, destinations, orders, stock, drivers, onDone,
 }: {
   plant: Plant
-  plants: Plant[]
+  /** Only companies this one actually supplies. Supply runs one way. */
+  destinations: Plant[]
   orders: Pick<Order, 'id' | 'order_no' | 'customer' | 'site'>[]
   stock: StockLevel[]
   drivers: Pick<Worker, 'id' | 'name' | 'phone'>[]
   onDone: () => void
 }) {
-  const others = plants.filter((p) => p.id !== plant.id)
+  const others = destinations
   const [kind, setKind] = useState<OutwardKind>('customer')
   const [f, setF] = useState({
     to_plant_id: others[0] ? String(others[0].id) : '',
@@ -169,14 +170,18 @@ function OutwardForm({
             className={'rounded-md px-4 py-2 text-sm font-medium transition ' + (kind === 'customer' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600')}>
             To a customer
           </button>
-          <button type="button" onClick={() => chooseKind('inter_unit')} disabled={others.length === 0}
-            className={'rounded-md px-4 py-2 text-sm font-medium transition disabled:opacity-40 ' + (kind === 'inter_unit' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600')}>
-            To our other company
-          </button>
+          {others.length > 0 && (
+            <button type="button" onClick={() => chooseKind('inter_unit')}
+              className={'rounded-md px-4 py-2 text-sm font-medium transition ' + (kind === 'inter_unit' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600')}>
+              To {others.length === 1 ? others[0].short_name : 'our other company'}
+            </button>
+          )}
         </div>
         <p className="mt-1.5 text-xs text-slate-500">
           {kind === 'customer'
-            ? 'Sold and gone. The goods come out of finished stock as soon as you record it.'
+            ? others.length === 0
+              ? plant.short_name + ' sends only to customers — it does not supply our other company.'
+              : 'Sold and gone. The goods come out of finished stock as soon as you record it.'
             : 'Leaves ' + plant.short_name + ' now, and only lands in the other company’s stock once they confirm it arrived.'}
         </p>
       </div>
@@ -304,7 +309,7 @@ function OutwardForm({
 }
 
 export default function Dispatch() {
-  const { scope, plant, plants, byId } = usePlant()
+  const { scope, plant, byId, sendableTo } = usePlant()
   const { can } = useAuth()
   const [days, setDays] = useState(60)
   const { data, loading, error, refresh } = useQuery(
@@ -378,7 +383,7 @@ export default function Dispatch() {
         <Card title={'New load out of ' + plant.short_name}>
           <OutwardForm
             plant={plant}
-            plants={plants}
+            destinations={sendableTo(plant.id)}
             orders={data.orders}
             stock={data.stock}
             drivers={data.drivers}
