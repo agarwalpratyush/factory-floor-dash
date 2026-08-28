@@ -169,6 +169,16 @@ export interface OrderItem {
   rate: number | null
 }
 
+export interface DispatchItem {
+  id: number
+  dispatch_id: number
+  material_id: number
+  order_item_id: number | null
+  qty: number
+  unit: string
+  ff_materials?: Pick<Material, 'code' | 'name' | 'unit'>
+}
+
 export interface Dispatch {
   id: number
   plant_id: number
@@ -186,6 +196,7 @@ export interface Dispatch {
   status: DispatchStatus
   remarks: string | null
   ff_orders?: { order_no: string; customer: string } | null
+  ff_dispatch_items?: DispatchItem[]
 }
 
 export interface Production {

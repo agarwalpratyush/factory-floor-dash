@@ -363,14 +363,6 @@ export default function Stock() {
               </Card>
             )
           ))}
-
-          {byRole.finished.length > 0 && (
-            <p className="text-xs text-amber-700">
-              Finished goods only go up at present: producing raises the balance, but recording a
-              dispatch does not lower it. Treat these figures as produced-to-date rather than
-              what is on the floor until that is fixed.
-            </p>
-          )}
         </>
       )}
     </div>
