@@ -1,43 +1,55 @@
 import { useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useQuery } from '../lib/useQuery'
-import { usePlant, scopeKey } from '../lib/plant'
+import { usePlant, scopeKey, type PlantScope } from '../lib/plant'
+import { useAuth } from '../lib/auth'
 import {
   Badge, Button, Card, Empty, ErrorBox, Field, inputCls,
-  NeedPlant, NotHere, PlantTag, Spinner, Stat,
+  NeedPlant, PlantTag, Spinner, Stat,
 } from '../components/ui'
-import { daysAgo, fmtDate, fmtQty, today } from '../lib/format'
+import { CoilDetail, CoilEntryGrid, type CoilLogSummary } from '../components/CoilLog'
+import { daysAgo, fmtDate, fmtNum, fmtQty, today } from '../lib/format'
 import { SHIFTS } from '../lib/types'
 import type { Order, Production as Prod, StockLevel } from '../lib/types'
 
 interface InputRow { material_id: string; qty: string }
 
-async function loadPage(scope: number | 'group', from: string) {
-  let q = supabase
+/**
+ * Every run at either company is an ff_production row, coating shifts included —
+ * the coil register posts one underneath. So the log below is genuinely one list;
+ * only the form that creates a run changes with the company's process.
+ */
+async function loadPage(scope: PlantScope, from: string) {
+  let runQ = supabase
     .from('ff_production')
     .select('*, ff_materials!ff_production_output_material_id_fkey(code,name,unit), ff_orders(order_no), ff_production_inputs(id,material_id,qty,ff_materials(code,name,unit))')
     .gte('prod_date', from)
     .order('prod_date', { ascending: false })
     .order('id', { ascending: false })
-  if (scope !== 'group') q = q.eq('plant_id', scope)
+  if (scope !== 'group') runQ = runQ.eq('plant_id', scope)
 
-  let sq = supabase.from('ff_stock_levels').select('*').eq('active', true)
-  if (scope !== 'group') sq = sq.eq('plant_id', scope)
+  let stockQ = supabase.from('ff_stock_levels').select('*').eq('active', true)
+  if (scope !== 'group') stockQ = stockQ.eq('plant_id', scope)
 
-  let oq = supabase.from('ff_orders').select('id,order_no,customer').neq('stage', 'delivered').order('order_no')
-  if (scope !== 'group') oq = oq.eq('plant_id', scope)
+  let orderQ = supabase.from('ff_orders').select('id,order_no,customer').neq('stage', 'delivered').order('order_no')
+  if (scope !== 'group') orderQ = orderQ.eq('plant_id', scope)
 
-  const [prod, stock, orders] = await Promise.all([q, sq, oq])
-  const failed = [prod, stock, orders].find((r) => r.error)
+  let coilQ = supabase.from('ff_coil_log_summary').select('*')
+  if (scope !== 'group') coilQ = coilQ.eq('plant_id', scope)
+
+  const [runs, stock, orders, coils] = await Promise.all([runQ, stockQ, orderQ, coilQ])
+  const failed = [runs, stock, orders, coils].find((r) => r.error)
   if (failed?.error) throw new Error(failed.error.message)
 
   return {
-    runs: (prod.data ?? []) as Prod[],
+    runs: (runs.data ?? []) as Prod[],
     stock: (stock.data ?? []) as StockLevel[],
     orders: (orders.data ?? []) as Pick<Order, 'id' | 'order_no' | 'customer'>[],
+    coils: (coils.data ?? []) as (CoilLogSummary & { production_id: number | null })[],
   }
 }
 
+/** The output-and-inputs form: one thing made, from however many things consumed. */
 function RunForm({
   plantId, stock, orders, onDone,
 }: {
@@ -88,7 +100,7 @@ function RunForm({
     onDone()
   }
 
-  /** Warn, don't block — back-dated entries legitimately go below today's balance. */
+  /** Warn, don't block — a genuine correction may legitimately go below today's balance. */
   function shortfall(row: InputRow) {
     const s = stock.find((x) => String(x.material_id) === row.material_id)
     if (!s || !row.qty) return null
@@ -107,13 +119,13 @@ function RunForm({
             {SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </Field>
-        <Field label="Output material *">
+        <Field label="Made *">
           <select required value={f.output_material_id} onChange={(e) => setF({ ...f, output_material_id: e.target.value })} className={inputCls}>
             <option value="">Select…</option>
             {outputs.map((s) => <option key={s.material_id} value={s.material_id}>{s.code} — {s.name}</option>)}
           </select>
         </Field>
-        <Field label={'Output qty *' + (outMat ? ' (' + outMat.unit + ')' : '')}>
+        <Field label={'Quantity made *' + (outMat ? ' (' + outMat.unit + ')' : '')}>
           <input required type="number" step="0.001" min="0.001" value={f.output_qty} onChange={(e) => setF({ ...f, output_qty: e.target.value })} className={inputCls} />
         </Field>
       </div>
@@ -185,14 +197,26 @@ function RunForm({
 
 export default function Production() {
   const { scope, plant, byId, runs: runsProcess } = usePlant()
+  const { can } = useAuth()
   const [days, setDays] = useState(30)
   const [showNew, setShowNew] = useState(false)
+  const [openId, setOpenId] = useState<number | null>(null)
   const { data, loading, error, refresh } = useQuery(
     () => loadPage(scope, daysAgo(days)),
     'prod-' + scopeKey(scope) + '-' + days,
   )
 
   const runs = data?.runs ?? []
+
+  // A coating shift and a fabrication run are both runs. This is how a row knows
+  // whether it has coil detail worth opening.
+  const coilByRun = useMemo(() => {
+    const m = new Map<number, CoilLogSummary>()
+    for (const c of data?.coils ?? []) {
+      if (c.production_id != null) m.set(c.production_id, c)
+    }
+    return m
+  }, [data])
 
   const byOutput = useMemo(() => {
     const m = new Map<string, { qty: number; unit: string; runs: number }>()
@@ -206,40 +230,42 @@ export default function Production() {
     return [...m.entries()].sort((a, b) => b[1].runs - a[1].runs)
   }, [runs])
 
-  if (!runsProcess('fabrication')) {
-    return (
-      <NotHere title={(plant?.short_name ?? 'This company') + ' does not fabricate'}>
-        {plant?.short_name ?? 'This company'} only coats wire, so there are no free-form
-        production runs here. Record the coating line on <strong>Shift Log</strong> — it
-        captures every coil and posts the stock movements for you.
-      </NotHere>
-    )
-  }
+  // The company's process decides which form opens — not which tab you are on.
+  const coating = runsProcess('coating') && !runsProcess('fabrication')
+  const canEnter = can('ff_entry') && !!plant
+
+  const subtitle = !plant
+    ? 'Every run at both companies — coating shifts and fabrication alike.'
+    : coating
+      ? 'GI wire + PVC granules → PVC coated wire, recorded coil by coil.'
+      : 'GI wire → DT mesh rolls → gabion boxes.'
+
+  const granulesShown = [...coilByRun.values()].reduce((s, c) => s + Number(c.granules_used), 0)
 
   return (
     <div className="space-y-5">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Production</h1>
-          <p className="text-sm text-slate-500">
-            {plant
-              ? 'GI wire → DT mesh rolls → gabion boxes.'
-              : 'Runs at both companies. Coating shifts appear here from the Shift Log.'}
-          </p>
+          <p className="text-sm text-slate-500">{subtitle}</p>
         </div>
-        {plant && (
+        {canEnter && (
           <Button variant={showNew ? 'ghost' : 'primary'} onClick={() => setShowNew((s) => !s)}>
-            {showNew ? 'Cancel' : '+ Record run'}
+            {showNew ? 'Cancel' : coating ? '+ Record shift' : '+ Record run'}
           </Button>
         )}
       </header>
 
       {showNew && plant && data && (
-        <Card title={'Record a run · ' + plant.short_name}>
-          <RunForm plantId={plant.id} stock={data.stock} orders={data.orders} onDone={refresh} />
+        <Card title={(coating ? 'Coating shift · ' : 'Production run · ') + plant.short_name}>
+          {coating ? (
+            <CoilEntryGrid plantId={plant.id} stock={data.stock} onDone={refresh} />
+          ) : (
+            <RunForm plantId={plant.id} stock={data.stock} orders={data.orders} onDone={refresh} />
+          )}
         </Card>
       )}
-      {!plant && <NeedPlant what="record a run" />}
+      {!plant && <NeedPlant what="record production" />}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Runs in period" value={runs.length} />
@@ -262,37 +288,59 @@ export default function Production() {
           <Empty>No production recorded in this period.</Empty>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {runs.map((r) => (
-              <li key={r.id} className="py-3">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {scope === 'group' && <PlantTag code={byId(r.plant_id)?.code} />}
-                      <span className="font-semibold text-slate-900">{r.ff_materials?.code}</span>
-                      <span className="text-sm text-slate-600">{r.ff_materials?.name}</span>
-                      <Badge tone="green">+{fmtQty(r.output_qty)} {r.ff_materials?.unit}</Badge>
+            {runs.map((r) => {
+              const coil = coilByRun.get(r.id)
+              const open = openId === r.id
+              return (
+                <li key={r.id} className="py-3">
+                  <div
+                    className={'flex flex-wrap items-start justify-between gap-3 ' + (coil ? 'cursor-pointer' : '')}
+                    onClick={() => coil && setOpenId(open ? null : r.id)}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {scope === 'group' && <PlantTag code={byId(r.plant_id)?.code} />}
+                        <span className="font-semibold text-slate-900">{r.ff_materials?.code}</span>
+                        <span className="text-sm text-slate-600">{r.ff_materials?.name}</span>
+                        <Badge tone="green">+{fmtQty(r.output_qty)} {r.ff_materials?.unit}</Badge>
+                        {coil && <Badge tone="cyan">{coil.coils} coils · {Number(coil.pickup_pct).toFixed(2)}% pickup</Badge>}
+                        {coil && Number(coil.power_cuts) > 0 && <Badge tone="amber">{coil.power_cuts} power cuts</Badge>}
+                        {coil && (Number(coil.gi_out_of_tol) + Number(coil.pvc_out_of_tol)) > 0 && (
+                          <Badge tone="red">{Number(coil.gi_out_of_tol) + Number(coil.pvc_out_of_tol)} out of tolerance</Badge>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-slate-500">
+                        from{' '}
+                        {(r.ff_production_inputs ?? []).map((i, n) => (
+                          <span key={i.id}>
+                            {n > 0 && ' + '}
+                            <span className="text-slate-700">{fmtQty(i.qty)} {i.ff_materials?.unit} {i.ff_materials?.code}</span>
+                          </span>
+                        ))}
+                        {r.ff_orders?.order_no && <span className="ml-2 text-slate-400">· {r.ff_orders.order_no}</span>}
+                        {coil && <span className="ml-2 text-blue-600">· {open ? 'hide coils' : 'show coils'}</span>}
+                      </p>
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      from{' '}
-                      {(r.ff_production_inputs ?? []).map((i, n) => (
-                        <span key={i.id}>
-                          {n > 0 && ' + '}
-                          <span className="text-slate-700">{fmtQty(i.qty)} {i.ff_materials?.unit} {i.ff_materials?.code}</span>
-                        </span>
-                      ))}
-                      {r.ff_orders?.order_no && <span className="ml-2 text-slate-400">· {r.ff_orders.order_no}</span>}
-                    </p>
+                    <div className="shrink-0 text-right text-xs text-slate-500">
+                      <div>{fmtDate(r.prod_date)}</div>
+                      <div>{coil?.shift_label ? coil.shift_label : 'shift ' + r.shift}</div>
+                    </div>
                   </div>
-                  <div className="shrink-0 text-right text-xs text-slate-500">
-                    <div>{fmtDate(r.prod_date)}</div>
-                    <div>shift {r.shift}</div>
-                  </div>
-                </div>
-              </li>
-            ))}
+                  {open && coil && <CoilDetail log={coil} />}
+                </li>
+              )
+            })}
           </ul>
         )}
       </Card>
+
+      {!loading && coilByRun.size > 0 && (
+        <p className="text-xs text-slate-500">
+          Coating shifts carry their coil count and pickup. Open one to see every coil, with
+          slipped digits and out-of-tolerance diameters flagged. Granule use is derived from the
+          weights — {fmtNum(granulesShown, 1)} kg across the shifts shown.
+        </p>
+      )}
     </div>
   )
 }

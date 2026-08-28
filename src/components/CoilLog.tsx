@@ -1,18 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useQuery } from '../lib/useQuery'
-import { usePlant, scopeKey, type PlantScope } from '../lib/plant'
-import {
-  Badge, Button, Card, Empty, ErrorBox, Field, inputCls,
-  NeedPlant, NotHere, PlantTag, Spinner, Stat,
-} from '../components/ui'
-import { fmtDate, fmtNum, today } from '../lib/format'
+import { Button, ErrorBox, Field, inputCls, Spinner } from '../components/ui'
+import { fmtNum, today } from '../lib/format'
 import { SHIFTS } from '../lib/types'
 import type { StockLevel } from '../lib/types'
 
 interface CoilRow { gi_weight: string; gi_size: string; pvc_weight: string; pvc_size: string }
 
-interface LogSummary {
+export interface CoilLogSummary {
   id: number
   plant_id: number
   plant_code: string
@@ -46,19 +42,6 @@ interface CoilEntry {
 
 const blankRow = (): CoilRow => ({ gi_weight: '', gi_size: '', pvc_weight: '', pvc_size: '' })
 
-async function loadLogs(scope: PlantScope) {
-  let q = supabase.from('ff_coil_log_summary').select('*').order('log_date', { ascending: false })
-  if (scope !== 'group') q = q.eq('plant_id', scope)
-
-  let sq = supabase.from('ff_stock_levels').select('*').eq('active', true).order('code')
-  if (scope !== 'group') sq = sq.eq('plant_id', scope)
-
-  const [logs, stock] = await Promise.all([q, sq])
-  if (logs.error) throw new Error(logs.error.message)
-  if (stock.error) throw new Error(stock.error.message)
-  return { logs: (logs.data ?? []) as LogSummary[], stock: (stock.data ?? []) as StockLevel[] }
-}
-
 async function loadEntries(logId: number) {
   const { data, error } = await supabase
     .from('ff_coil_entries').select('*').eq('log_id', logId).order('seq')
@@ -67,7 +50,7 @@ async function loadEntries(logId: number) {
 }
 
 /** Detail table for one saved shift, with the same flags the entry grid shows. */
-function LogDetail({ log }: { log: LogSummary }) {
+export function CoilDetail({ log }: { log: CoilLogSummary }) {
   const { data, loading, error, refresh } = useQuery(() => loadEntries(log.id), 'coils-' + log.id)
   if (loading) return <Spinner label="Loading coils…" />
   if (error) return <ErrorBox error={error} onRetry={refresh} />
@@ -122,7 +105,7 @@ function LogDetail({ log }: { log: LogSummary }) {
   )
 }
 
-function EntryGrid({
+export function CoilEntryGrid({
   plantId, stock, onDone,
 }: {
   plantId: number
@@ -368,121 +351,5 @@ function EntryGrid({
         {busy ? 'Saving…' : 'Save shift log'}
       </Button>
     </form>
-  )
-}
-
-export default function ShiftLog() {
-  const { scope, plant, byId, runs } = usePlant()
-  const { data, loading, error, refresh } = useQuery(() => loadLogs(scope), 'shiftlog-' + scopeKey(scope))
-  const [showNew, setShowNew] = useState(false)
-  const [openId, setOpenId] = useState<number | null>(null)
-
-  const logs = data?.logs ?? []
-  const recent = useMemo(() => logs.slice(0, 30), [logs])
-
-  const avgPickup = logs.length
-    ? logs.reduce((s, l) => s + Number(l.pickup_pct), 0) / logs.length
-    : 0
-  const totalGranules = logs.reduce((s, l) => s + Number(l.granules_used), 0)
-  const totalCuts = logs.reduce((s, l) => s + Number(l.power_cuts), 0)
-
-  if (!runs('coating')) {
-    return (
-      <NotHere title={(plant?.short_name ?? 'This company') + ' has no coating line'}>
-        The coil register belongs to whichever company coats wire.
-        {' '}{plant?.short_name ?? 'This company'} buys its coated wire in, so record mesh and
-        box making on <strong>Production</strong> instead.
-      </NotHere>
-    )
-  }
-
-  return (
-    <div className="space-y-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">Coating Shift Log</h1>
-          <p className="text-sm text-slate-500">
-            One row per coil, exactly as the register is kept. Granule consumption is worked out from the weights — nobody has to weigh it.
-          </p>
-        </div>
-        {plant && (
-          <Button variant={showNew ? 'ghost' : 'primary'} onClick={() => setShowNew((s) => !s)}>
-            {showNew ? 'Cancel' : '+ Enter a shift'}
-          </Button>
-        )}
-      </header>
-
-      {showNew && plant && data && (
-        <Card title={'New shift log · ' + plant.short_name}>
-          <EntryGrid plantId={plant.id} stock={data.stock} onDone={refresh} />
-        </Card>
-      )}
-      {!plant && <NeedPlant what="enter a shift log" />}
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Shifts logged" value={logs.length} />
-        <Stat label="Avg pickup" value={avgPickup.toFixed(2) + '%'} sub="granules per kg of GI wire" />
-        <Stat label="Granules consumed" value={fmtNum(totalGranules, 1) + ' kg'} sub="derived, never weighed" />
-        <Stat
-          label="Power cuts"
-          value={totalCuts}
-          sub={totalCuts ? 'across all logged shifts' : 'none recorded'}
-          tone={totalCuts > 4 ? 'warn' : 'neutral'}
-        />
-      </div>
-
-      <Card title="Shifts">
-        {loading ? <Spinner /> : error ? <ErrorBox error={error} onRetry={refresh} /> : recent.length === 0 ? (
-          <Empty>No shift logs yet.</Empty>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {recent.map((l) => (
-              <li key={l.id} className="py-3">
-                <div
-                  className="flex cursor-pointer flex-wrap items-start justify-between gap-3"
-                  onClick={() => setOpenId(openId === l.id ? null : l.id)}
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {scope === 'group' && <PlantTag code={byId(l.plant_id)?.code} />}
-                      <span className="font-semibold text-slate-900">{fmtDate(l.log_date)}</span>
-                      <Badge tone="slate">{l.shift_label || 'Shift ' + l.shift}</Badge>
-                      <Badge tone="blue">{fmtNum(l.nominal_size_mm, 2)} mm</Badge>
-                      <span className="text-sm text-slate-600">{l.coils} coils</span>
-                      {Number(l.power_cuts) > 0 && <Badge tone="amber">{l.power_cuts} power cuts</Badge>}
-                      {(Number(l.gi_out_of_tol) > 0 || Number(l.pvc_out_of_tol) > 0) && (
-                        <Badge tone="red">
-                          {Number(l.gi_out_of_tol) + Number(l.pvc_out_of_tol)} out of tolerance
-                        </Badge>
-                      )}
-                    </div>
-                    {l.remarks && <p className="mt-0.5 text-xs text-slate-500">{l.remarks}</p>}
-                  </div>
-                  <div className="flex shrink-0 gap-5 text-right text-sm">
-                    <div>
-                      <div className="text-xs text-slate-500">GI in</div>
-                      <div className="tabular-nums text-slate-800">{fmtNum(l.gi_total, 1)} kg</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-slate-500">Coated out</div>
-                      <div className="tabular-nums text-slate-800">{fmtNum(l.pvc_total, 1)} kg</div>
-                    </div>
-                    <div>
-                      <div className="text-xs text-slate-500">Granules</div>
-                      <div className="tabular-nums text-slate-800">{fmtNum(l.granules_used, 1)} kg</div>
-                    </div>
-                    <div className="w-16">
-                      <div className="text-xs text-slate-500">Pickup</div>
-                      <div className="font-semibold tabular-nums text-blue-700">{Number(l.pickup_pct).toFixed(2)}%</div>
-                    </div>
-                  </div>
-                </div>
-                {openId === l.id && <LogDetail log={l} />}
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-    </div>
   )
 }

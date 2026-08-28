@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import Layout from './components/Layout'
 import { PlantProvider } from './lib/plant'
 import { AuthProvider, useAuth } from './lib/auth'
@@ -7,7 +7,6 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Orders from './pages/Orders'
 import Production from './pages/Production'
-import ShiftLog from './pages/ShiftLog'
 import Materials from './pages/Materials'
 import Stock from './pages/Stock'
 import Transfers from './pages/Transfers'
@@ -44,8 +43,9 @@ function Gate() {
           <Route element={<Layout />}>
             <Route index element={<Dashboard />} />
             <Route path="orders" element={<Orders />} />
-            <Route path="shift-log" element={<ShiftLog />} />
             <Route path="production" element={<Production />} />
+            {/* Shift Log folded into Production; keep old links working. */}
+            <Route path="shift-log" element={<Navigate to="/production" replace />} />
             <Route path="materials" element={<Materials />} />
             <Route path="stock" element={<Stock />} />
             <Route path="transfers" element={<Transfers />} />
