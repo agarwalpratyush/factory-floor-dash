@@ -347,10 +347,12 @@ export const DESIGNATIONS = [
 ]
 
 /** Daily-wage labour is hired by the day, so it is counted rather than named. */
+/** Casual hands, counted rather than named. Many lots per company per day. */
 export interface DailyLabour {
   id: number
   plant_id: number
   work_date: string
+  work: string | null
   head_count: number
   rate_per_head: number | null
   remarks: string | null

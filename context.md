@@ -170,6 +170,18 @@ Which rows are open is held in the page component, not in `WorkerRow` — that i
 declared inside `Attendance` and so remounts on every render, which is also why the
 overtime input is uncontrolled.
 
+**Casual labour is its own register, not a footnote to the roll.** Nobody in it is
+named, nothing is marked present or absent, and the count changes every day, so it
+sits in a separate card under the roll rather than among people who have codes.
+
+`ff_daily_labour` used to be `unique (plant_id, work_date)` — one head count and one
+rate per company per day. That cannot describe a real day: four on mesh at 500 and
+two on loading at 400 average into a figure true of neither lot. The constraint is
+gone and a day carries as many lots as it needs, each with its own count and rate;
+`work` is what tells them apart. Deleting a lot needs only `ff_entry` and
+authorship now, not an administrator — removing a line you just typed should not
+need somebody else.
+
 **A worker profile is editable; the days behind it are not.** Everything on
 `ff_workers` can be changed except `code` — the code is how a person is identified
 on the paper register and on every day already recorded, so it is read-only once the

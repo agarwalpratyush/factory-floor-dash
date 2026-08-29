@@ -263,54 +263,142 @@ function WorkerForm({
   )
 }
 
-function CasualLabourCard({
-  plantId, date, existing, onDone,
-}: { plantId: number; date: string; existing: DailyLabour | undefined; onDone: () => void }) {
-  const [count, setCount] = useState(existing ? String(existing.head_count) : '')
-  const [rate, setRate] = useState(existing?.rate_per_head ? String(existing.rate_per_head) : '')
+/**
+ * Casual hands are counted, not named - they change day to day, and a name nobody
+ * can check is worse than a number that can be. But one count and one rate per day
+ * describes a day that rarely happens: four on mesh at 500 and two on loading at
+ * 400 average into a figure true of neither. A day carries as many lots as it
+ * needs, and `work` is what tells them apart.
+ */
+function DailyLabourCard({
+  plantId, date, lines, canEnter, onDone,
+}: {
+  plantId: number
+  date: string
+  lines: DailyLabour[]
+  canEnter: boolean
+  onDone: () => void
+}) {
+  const [f, setF] = useState({ work: '', count: '', rate: '' })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  async function save() {
+  const heads = lines.reduce((n, l) => n + Number(l.head_count), 0)
+  const cost = lines.reduce((n, l) => n + Number(l.head_count) * Number(l.rate_per_head ?? 0), 0)
+  const anyRate = lines.some((l) => l.rate_per_head !== null)
+
+  async function add(e: React.FormEvent) {
+    e.preventDefault()
     setBusy(true)
     setErr(null)
-    const { error } = await supabase.from('ff_daily_labour').upsert(
-      {
-        plant_id: plantId,
-        work_date: date,
-        head_count: Number(count) || 0,
-        rate_per_head: rate ? Number(rate) : null,
-        recorded_by: 'supervisor',
-      },
-      { onConflict: 'plant_id,work_date' },
-    )
+    const { error } = await supabase.from('ff_daily_labour').insert({
+      plant_id: plantId,
+      work_date: date,
+      work: f.work.trim() || null,
+      head_count: Number(f.count) || 0,
+      rate_per_head: f.rate ? Number(f.rate) : null,
+      recorded_by: 'supervisor',
+    })
     setBusy(false)
     if (error) setErr(error.message)
+    else { setF({ work: '', count: '', rate: '' }); onDone() }
+  }
+
+  async function remove(id: number) {
+    setBusy(true)
+    setErr(null)
+    const { error } = await supabase.from('ff_daily_labour').delete().eq('id', id)
+    setBusy(false)
+    if (error) setErr(error.message + ' - only whoever recorded a lot can remove it.')
     else onDone()
   }
 
-  const total = (Number(count) || 0) * (Number(rate) || 0)
-
   return (
-    <Card title="Daily-wage labour">
+    <Card title={'Daily-wage labour ' + '·' + ' ' + date}>
       <p className="-mt-1 mb-3 text-xs text-slate-500">
-        Casual hands are not on the rolls, so they are counted for the day rather than named.
+        Not on the rolls, so they are counted for the day rather than named. Add a lot
+        for each group on different work or a different rate.
       </p>
-      <div className="flex flex-wrap items-end gap-3">
-        <Field label="How many today">
-          <input type="number" min="0" value={count} onChange={(e) => setCount(e.target.value)} className={inputCls + ' w-28'} />
-        </Field>
-        <Field label="Rate per head (₹)">
-          <input type="number" min="0" value={rate} onChange={(e) => setRate(e.target.value)} className={inputCls + ' w-32'} />
-        </Field>
-        <div className="pb-1">
-          <div className="text-xs text-slate-500 uppercase">Day total</div>
-          <div className="text-lg font-semibold tabular-nums">{total > 0 ? '₹' + fmtNum(total, 0) : '—'}</div>
+
+      {lines.length === 0 ? (
+        <Empty>No casual labour recorded for this day.</Empty>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="text-xs tracking-wide text-slate-500 uppercase">
+              <tr className="border-b border-slate-200">
+                <th className="py-2 pr-3 font-medium">Put on</th>
+                <th className="py-2 pr-3 text-right font-medium">Hands</th>
+                <th className="py-2 pr-3 text-right font-medium">Rate</th>
+                <th className="py-2 pr-3 text-right font-medium">Cost</th>
+                <th className="py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((l) => (
+                <tr key={l.id} className="border-b border-slate-100 last:border-0">
+                  <td className="py-2 pr-3">{l.work ?? <span className="text-slate-400">unspecified</span>}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums">{l.head_count}</td>
+                  <td className="py-2 pr-3 text-right tabular-nums text-slate-500">
+                    {l.rate_per_head !== null ? '₹' + fmtNum(Number(l.rate_per_head), 0) : '—'}
+                  </td>
+                  <td className="py-2 pr-3 text-right tabular-nums">
+                    {l.rate_per_head !== null
+                      ? '₹' + fmtNum(Number(l.head_count) * Number(l.rate_per_head), 0)
+                      : '—'}
+                  </td>
+                  <td className="py-2 text-right">
+                    {canEnter && (
+                      <button
+                        onClick={() => remove(l.id)}
+                        disabled={busy}
+                        title="Remove this lot"
+                        className="rounded-md px-2 py-1 text-xs text-slate-400 transition hover:bg-red-50 hover:text-red-700"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-slate-200 font-medium">
+                <td className="py-2 pr-3 text-xs tracking-wide text-slate-500 uppercase">
+                  {lines.length} lot{lines.length === 1 ? '' : 's'}
+                </td>
+                <td className="py-2 pr-3 text-right tabular-nums">{heads}</td>
+                <td className="py-2 pr-3" />
+                <td className="py-2 pr-3 text-right tabular-nums">{anyRate ? '₹' + fmtNum(cost, 0) : '—'}</td>
+                <td className="py-2" />
+              </tr>
+            </tfoot>
+          </table>
         </div>
-        <Button onClick={save} disabled={busy || count === ''} className="mb-0.5">
-          {busy ? 'Saving…' : existing ? 'Update' : 'Save'}
-        </Button>
-      </div>
+      )}
+
+      {canEnter && (
+        <form onSubmit={add} className="mt-4 flex flex-wrap items-end gap-3 border-t border-slate-100 pt-4">
+          <Field label="Put on">
+            <input
+              value={f.work}
+              onChange={(e) => setF({ ...f, work: e.target.value })}
+              className={inputCls + ' w-44'}
+              placeholder="mesh, loading, cleaning…"
+            />
+          </Field>
+          <Field label="How many *">
+            <input required type="number" min="1" value={f.count} onChange={(e) => setF({ ...f, count: e.target.value })} className={inputCls + ' w-24'} />
+          </Field>
+          <Field label="Rate per head (₹)">
+            <input type="number" min="0" value={f.rate} onChange={(e) => setF({ ...f, rate: e.target.value })} className={inputCls + ' w-32'} />
+          </Field>
+          <Button type="submit" disabled={busy || f.count === ''} className="mb-0.5">
+            {busy ? 'Saving…' : 'Add lot'}
+          </Button>
+        </form>
+      )}
+
       {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
     </Card>
   )
@@ -735,18 +823,8 @@ export default function Attendance() {
         )}
       </div>
 
-      {plant && (
-        <CasualLabourCard
-          key={plant.id + date}
-          plantId={plant.id}
-          date={date}
-          existing={labour.find((l) => l.plant_id === plant.id)}
-          onDone={day.refresh}
-        />
-      )}
-
       <Card
-        title={'Mark attendance · ' + date}
+        title={'Staff on the rolls · ' + date}
         action={
           <Button variant="ghost" onClick={markAllPresent} disabled={marked === workers.length}>
             Mark rest present
@@ -788,6 +866,23 @@ export default function Attendance() {
           </div>
         )}
       </Card>
+
+      {/* Casual labour is its own register, not a footnote to the roll: nobody
+          here is named, nothing is marked P or A, and the count changes daily. */}
+      {plant ? (
+        <DailyLabourCard
+          key={plant.id + date}
+          plantId={plant.id}
+          date={date}
+          lines={labour.filter((l) => l.plant_id === plant.id)}
+          canEnter={can('ff_entry')}
+          onDone={day.refresh}
+        />
+      ) : (
+        <Card title={'Daily-wage labour · ' + date}>
+          <NeedPlant what="record daily labour" />
+        </Card>
+      )}
     </div>
   )
 }
