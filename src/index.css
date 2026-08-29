@@ -1,2 +1,156 @@
-/* The tool skin is the source of truth. Nothing is defined here. */
-@import "./tool-skin.css";
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap");
+@import "tailwindcss";
+
+/* ============================================================================
+   Token block — the only place a colour is written down.
+   A buyer rebrands by changing the brand block and nothing else.
+   ========================================================================= */
+:root {
+  /* type */
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-num: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --text-body: 13px;
+  --text-caption: 11.5px;
+  --text-label: 11px;
+
+  /* geometry */
+  --radius: 2px;
+
+  /* surfaces & lines */
+  --bg: #FFFFFF;
+  --surface: #FAFBFB;
+  --surface-sunk: #F2F4F4;
+  --line: #E2E6E7;
+  --line-strong: #C8CFD1;
+
+  /* text */
+  --text: #15181A;
+  --text-muted: #5F686B;
+  --text-faint: #949C9E;
+
+  /* state — semantic only */
+  --ok: #196B45;
+  --warn: #8A5A00;
+  --fail: #A32116;
+  --ok-bg: #ECF5F0;
+  --warn-bg: #FBF3E4;
+  --fail-bg: #FBEDEC;
+
+  /* brand — THE ONLY BLOCK A BUYER OVERRIDES */
+  --brand-name: "Factory Floor";
+  --accent: #1F4E5F;
+  --accent-hover: #18404E;
+  --accent-bg: #EDF3F5;
+}
+
+/* ============================================================================
+   Tailwind's palette is remapped onto those tokens, so the existing markup
+   picks up the new colours without a single class changing. `inline` makes
+   Tailwind emit var() references rather than resolving to literals.
+   ========================================================================= */
+@theme inline {
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-num);
+
+  /* Corners are 2px everywhere. */
+  --radius-sm: var(--radius);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius);
+  --radius-xl: var(--radius);
+  --radius-2xl: var(--radius);
+  --radius-3xl: var(--radius);
+
+  /* Greys carry structure, never meaning. */
+  --color-white: var(--bg);
+  --color-slate-50: var(--surface);
+  --color-slate-100: var(--surface-sunk);
+  --color-slate-200: var(--line);
+  --color-slate-300: var(--line-strong);
+  --color-slate-400: var(--text-faint);
+  --color-slate-500: var(--text-muted);
+  --color-slate-600: var(--text-muted);
+  --color-slate-700: var(--text);
+  --color-slate-800: var(--text);
+  --color-slate-900: var(--text);
+
+  /* Accent. Steel teal rather than green, so green keeps meaning "pass". */
+  --color-blue-50: var(--accent-bg);
+  --color-blue-100: var(--accent-bg);
+  --color-blue-200: var(--accent);
+  --color-blue-500: var(--accent);
+  --color-blue-600: var(--accent);
+  --color-blue-700: var(--accent-hover);
+
+  /* Pass. */
+  --color-green-50: var(--ok-bg);
+  --color-green-100: var(--ok-bg);
+  --color-green-200: var(--ok);
+  --color-green-600: var(--ok);
+  --color-green-700: var(--ok);
+
+  /* Review. */
+  --color-amber-50: var(--warn-bg);
+  --color-amber-100: var(--warn-bg);
+  --color-amber-200: var(--warn);
+  --color-amber-500: var(--warn);
+  --color-amber-600: var(--warn);
+  --color-amber-700: var(--warn);
+
+  /* Fail. */
+  --color-red-50: var(--fail-bg);
+  --color-red-100: var(--fail-bg);
+  --color-red-200: var(--fail);
+  --color-red-600: var(--fail);
+  --color-red-700: var(--fail);
+  --color-red-800: var(--fail);
+
+  /* Violet and cyan were decorative. Colour reports state or it is grey. */
+  --color-violet-50: var(--surface-sunk);
+  --color-violet-200: var(--line-strong);
+  --color-violet-600: var(--text-muted);
+  --color-violet-700: var(--text-muted);
+  --color-cyan-50: var(--surface-sunk);
+  --color-cyan-200: var(--line-strong);
+  --color-cyan-700: var(--text-muted);
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Data entry happens on a keyboard, so focus is never removed. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Every figure lines up: monospace, tabular, right-aligned. */
+.tabular-nums { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+/* Wide content scrolls inside its own box, never the page. */
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+/* Stops iOS zooming the page when a field takes focus. */
+input, select, textarea { font-size: 16px; }
+@media (pointer: fine) {
+  input, select, textarea { font-size: var(--text-body); }
+}
+
+/* These tools produce logs and challans that get printed and signed. */
+@media print {
+  @page { margin: 12mm; }
+  body { background: var(--bg); }
+  aside, nav, button { display: none !important; }
+  main { padding: 0 !important; }
+  .scroll-x { overflow: visible !important; }
+  table { break-inside: auto; }
+  tr { break-inside: avoid; }
+  a { color: var(--text); text-decoration: none; }
+}

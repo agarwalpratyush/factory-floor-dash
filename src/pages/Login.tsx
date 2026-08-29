@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
-import { Button, Field } from '../components/ui'
-import { ACCOUNTS_URL, BRAND_NAME } from '../lib/brand'
+import { Button, Field, inputCls } from '../components/ui'
+
+const DASHBOARD_URL = 'https://agarwalgabions.com/dashboard'
 
 export default function Login() {
   const { session, me, loading, signOut } = useAuth()
@@ -23,58 +24,53 @@ export default function Login() {
     if (error) setErr(error.message)
   }
 
+  // Signed in, but this email is not on the staff list.
   const signedInButUnauthorised = !loading && session && !me
 
   return (
-    <div className="app-frame">
-      <div className="app-bar">
-        <span className="logo-slot" />
-        <span className="app-name" />
-      </div>
+    <div className="flex min-h-full items-center justify-center bg-slate-900 p-4">
+      <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
+        <h1 className="text-lg font-semibold text-slate-900">Factory Floor</h1>
+        <p className="mt-0.5 mb-5 text-sm text-slate-500">Saffron &amp; Agarwal</p>
 
-      <div className="app-body" style={{ alignItems: 'flex-start', justifyContent: 'center', overflow: 'auto' }}>
-        <div className="col" style={{ flex: '0 0 320px', borderRight: 0, paddingTop: 32 }}>
-          {signedInButUnauthorised ? (
-            <>
-              <div className="alert is-warn">
-                Signed in as {session.user.email}. That address has no access to {BRAND_NAME}.
-              </div>
-              <Button onClick={signOut}>Sign out</Button>
-            </>
-          ) : (
-            <form onSubmit={signIn} className="stack">
-              <Field label="Email">
-                <input
-                  className="input" type="email" required autoFocus autoComplete="username"
-                  value={email} onChange={(e) => setEmail(e.target.value)}
-                />
-              </Field>
-              <Field label="Password">
-                <input
-                  className="input" type="password" required autoComplete="current-password"
-                  value={password} onChange={(e) => setPassword(e.target.value)}
-                />
-              </Field>
-              {err && <div className="alert is-fail">{err}</div>}
-              <button type="submit" className="btn btn-primary" disabled={busy}>
-                {busy ? 'Signing in…' : 'Sign in'}
-              </button>
-            </form>
-          )}
+        {signedInButUnauthorised ? (
+          <div className="space-y-3">
+            <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 ring-1 ring-amber-200">
+              You are signed in as <strong>{session.user.email}</strong>, but that address has no
+              access to the factory system.
+            </p>
+            <Button variant="ghost" onClick={signOut} className="w-full">Sign out</Button>
+          </div>
+        ) : (
+          <form onSubmit={signIn} className="space-y-3">
+            <Field label="Email">
+              <input
+                type="email" required autoFocus autoComplete="username"
+                value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls}
+              />
+            </Field>
+            <Field label="Password">
+              <input
+                type="password" required autoComplete="current-password"
+                value={password} onChange={(e) => setPassword(e.target.value)} className={inputCls}
+              />
+            </Field>
+            {err && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>}
+            <Button type="submit" disabled={busy} className="w-full">
+              {busy ? 'Signing in…' : 'Sign in'}
+            </Button>
+          </form>
+        )}
 
-          <hr className="divider" />
-          <p className="muted" style={{ fontSize: 'var(--text-caption)' }}>
-            Accounts and passwords are handled on the{' '}
-            <a href={ACCOUNTS_URL} target="_blank" rel="noreferrer">group dashboard</a>. Change your
-            own under My password, or ask the administrator to set it under People. No email is sent.
-          </p>
-        </div>
-      </div>
-
-      <div className="status-bar">
-        <span className="path">Sign in required</span>
-        <span className="spacer" />
-        <span className="faint">Only addresses already on the staff list can sign in</span>
+        {/* Accounts and passwords are managed in one place, on the main dashboard. */}
+        <p className="mt-5 border-t border-slate-100 pt-4 text-xs text-slate-500">
+          Accounts and passwords are handled on the{' '}
+          <a href={DASHBOARD_URL} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+            Agarwal Gabions dashboard
+          </a>
+          {' '}— change your own under <em>My password</em>, or ask the administrator to set it
+          under <em>People</em>. This system never sends email.
+        </p>
       </div>
     </div>
   )
