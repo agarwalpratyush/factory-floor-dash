@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useEffect, useRef, useState } from 'react'
 import { usePlant } from '../lib/plant'
 import { useAuth, type Perm } from '../lib/auth'
+import { ACCOUNTS_URL } from '../lib/brand'
 
 /**
  * `need` is the permission that makes a page worth showing.
@@ -78,8 +79,29 @@ function PlantSwitcher() {
 
 function ProfileMenu() {
   const { me, can, signOut } = useAuth()
+  const { plants, pinned } = usePlant()
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
+
+  // Most logins have no full name recorded. Rather than invent one from the
+  // address, the menu falls back to the email itself and drops the second line;
+  // only the header button shortens it, where space is tight.
+  const fullName = me?.full_name?.trim() || ''
+  const headline = fullName || me?.email || 'Account'
+  const buttonLabel = fullName || me?.email?.split('@')[0] || 'Account'
+
+  const scope = pinned !== null
+    ? plants.find((p) => p.id === pinned)?.name ?? 'One company'
+    : 'Both companies'
+
+  // What you cannot do is the useful half: it answers "why is this greyed out".
+  const limits = [
+    !can('ff_orders_write') && 'Cannot place or change orders',
+    !can('ff_manage') && 'Cannot record dispatches or edit masters',
+    !can('ff_entry') && 'Cannot record production or attendance',
+    !can('ff_money') && 'Costs, rates and wages are hidden',
+    !can('ff_backdate') && 'Entries must be dated today',
+  ].filter(Boolean) as string[]
 
   // Close on a click anywhere else, and on Escape.
   useEffect(() => {
@@ -102,25 +124,64 @@ function ProfileMenu() {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="max-w-[220px] truncate rounded-lg px-3 py-1.5 text-sm text-slate-300 ring-1 ring-slate-700 transition hover:bg-slate-800 hover:text-white"
+        className="max-w-[180px] truncate rounded-lg px-3 py-1.5 text-sm text-slate-300 ring-1 ring-slate-700 transition hover:bg-slate-800 hover:text-white"
       >
-        {me?.full_name || me?.email}
+        {buttonLabel}
       </button>
 
       {open && (
         <div
           role="menu"
-          className="absolute right-0 z-20 mt-1 w-64 rounded-lg bg-white py-1 shadow-lg ring-1 ring-slate-200"
+          className="absolute right-0 z-20 mt-1 w-72 rounded-lg bg-white py-1 shadow-lg ring-1 ring-slate-200"
         >
           <div className="px-3 py-2">
-            <div className="truncate text-sm font-medium text-slate-900">{me?.email}</div>
-            <div className="text-xs text-slate-500">
-              {me?.role_label ?? me?.role}
-              {!can('ff_money') && ' · no cost access'}
-              {!can('ff_orders_write') && ' · orders read-only'}
-            </div>
+            <div className="truncate text-sm font-medium text-slate-900">{headline}</div>
+            {fullName && <div className="truncate text-xs text-slate-500">{me?.email}</div>}
           </div>
-          <hr className="my-1 border-slate-200" />
+
+          <hr className="border-slate-200" />
+
+          <dl className="px-3 py-2 text-xs">
+            <div className="flex justify-between gap-3">
+              <dt className="text-slate-500">Role</dt>
+              <dd className="font-medium text-slate-900">{me?.role_label ?? me?.role}</dd>
+            </div>
+            <div className="mt-1 flex justify-between gap-3">
+              <dt className="text-slate-500">Sees</dt>
+              <dd className="truncate font-medium text-slate-900">{scope}</dd>
+            </div>
+          </dl>
+
+          <hr className="border-slate-200" />
+
+          <div className="px-3 py-2">
+            {limits.length === 0 ? (
+              <p className="text-xs text-slate-500">Full access. Nothing here is hidden or read-only.</p>
+            ) : (
+              <>
+                <p className="mb-1 text-xs text-slate-500">On this account</p>
+                <ul className="space-y-0.5">
+                  {limits.map((l) => (
+                    <li key={l} className="text-xs text-slate-700">{l}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </div>
+
+          <hr className="border-slate-200" />
+
+          <a
+            role="menuitem"
+            href={ACCOUNTS_URL}
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => setOpen(false)}
+            className="block px-3 py-2 text-sm text-slate-700 transition hover:bg-slate-50"
+          >
+            Change password
+            <span className="block text-xs text-slate-400">on the group dashboard</span>
+          </a>
           <button
             role="menuitem"
             onClick={() => { setOpen(false); signOut() }}

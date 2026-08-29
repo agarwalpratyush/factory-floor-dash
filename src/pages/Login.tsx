@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import { Button, Field, inputCls } from '../components/ui'
+import { ACCOUNTS_URL } from '../lib/brand'
 
-const DASHBOARD_URL = 'https://agarwalgabions.com/dashboard'
 
 export default function Login() {
   const { session, me, loading, signOut } = useAuth()
@@ -65,7 +65,7 @@ export default function Login() {
         {/* Accounts and passwords are managed in one place, on the main dashboard. */}
         <p className="mt-5 border-t border-slate-100 pt-4 text-xs text-slate-500">
           Accounts and passwords are handled on the{' '}
-          <a href={DASHBOARD_URL} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
+          <a href={ACCOUNTS_URL} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">
             Agarwal Gabions dashboard
           </a>
           {' '}— change your own under <em>My password</em>, or ask the administrator to set it
