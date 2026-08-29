@@ -261,12 +261,15 @@ export default function Attendance() {
     else { day.refresh(); month.refresh() }
   }
 
-  async function setOt(worker: Worker, hours: number) {
+  /** Amends a day that is already marked. Everything in the details strip goes
+   *  through here, so a change is saved where it is made rather than only in
+   *  local state - which is how the site picker used to lose its value. */
+  async function patch(worker: Worker, fields: Partial<Att>) {
     setSaving(worker.id)
     setErr(null)
     const { error } = await supabase
       .from('ff_attendance')
-      .update({ ot_hours: hours })
+      .update(fields)
       .eq('work_date', date)
       .eq('worker_id', worker.id)
     setSaving(null)
@@ -353,23 +356,11 @@ export default function Attendance() {
             {w.designation && <Badge tone={isGroup ? 'violet' : 'slate'}>{w.designation}</Badge>}
           </div>
           <div className="text-xs text-slate-500">
-            {w.code} · shift {cur?.shift ?? w.shift_default}
+            {w.code}
             {stat && ' · ' + fmtNum(stat.present, 1) + 'd present /30'}
           </div>
           {w.notes && <div className="text-xs text-amber-700">{w.notes}</div>}
         </div>
-
-        {isGroup && (
-          <select
-            value={siteOf(w) ?? ''}
-            onChange={(e) => setSiteFor({ ...siteFor, [w.id]: Number(e.target.value) })}
-            className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs"
-            title="Which site were they at?"
-          >
-            <option value="">site?</option>
-            {plants.map((p) => <option key={p.id} value={p.id}>{p.short_name}</option>)}
-          </select>
-        )}
 
         <div className="flex flex-wrap gap-1.5">
           {STATUSES.map((s) => {
@@ -390,26 +381,6 @@ export default function Attendance() {
             )
           })}
         </div>
-        {w.ot_eligible ? (
-          <label className="flex items-center gap-1 text-xs text-slate-500">
-            OT
-            <input
-              type="number" min={0} max={12} step={0.5}
-              defaultValue={Number(cur?.ot_hours ?? 0) || ''}
-              disabled={!cur || saving === w.id}
-              onBlur={(e) => {
-                const v = Number(e.target.value || 0)
-                if (v !== Number(cur?.ot_hours ?? 0)) setOt(w, v)
-              }}
-              placeholder="0"
-              title={cur ? 'Overtime hours' : 'Mark attendance first'}
-              className="w-14 rounded-md border border-slate-300 px-1.5 py-1 text-right text-xs tabular-nums disabled:bg-slate-50"
-            />
-            h
-          </label>
-        ) : (
-          <span className="text-xs text-slate-400" title="Managers do not draw overtime">no OT</span>
-        )}
         {cur && !STATUSES.includes(cur.status) && (
           <span
             className="text-xs text-slate-500"
@@ -419,6 +390,67 @@ export default function Attendance() {
           </span>
         )}
         {!cur && <Badge tone="amber">not marked</Badge>}
+
+        {cur?.status === 'present' && (
+          <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-200 pt-2 text-xs text-slate-500">
+            <label className="flex items-center gap-1.5">
+              Shift
+              <select
+                value={cur.shift}
+                disabled={saving === w.id}
+                onChange={(e) => patch(w, { shift: e.target.value })}
+                className="rounded-md border border-slate-300 px-1.5 py-1 text-xs"
+              >
+                {SHIFTS.map((sh) => <option key={sh.value} value={sh.value}>{sh.label}</option>)}
+              </select>
+            </label>
+
+            {w.ot_eligible ? (
+              <label className="flex items-center gap-1.5">
+                Overtime
+                <input
+                  type="number" min={0} max={12} step={0.5}
+                  defaultValue={Number(cur.ot_hours) || ''}
+                  disabled={saving === w.id}
+                  onBlur={(e) => {
+                    const v = Number(e.target.value || 0)
+                    if (v !== Number(cur.ot_hours)) patch(w, { ot_hours: v })
+                  }}
+                  placeholder="0"
+                  className="w-14 rounded-md border border-slate-300 px-1.5 py-1 text-right tabular-nums"
+                />
+                h
+              </label>
+            ) : (
+              <span className="text-slate-400" title="Managers are salaried for the job, not the hour">
+                No overtime
+              </span>
+            )}
+
+            {isGroup && (
+              <label className="flex items-center gap-1.5">
+                Site
+                <select
+                  value={cur.at_plant_id ?? ''}
+                  disabled={saving === w.id}
+                  onChange={(e) => {
+                    const v = Number(e.target.value)
+                    setSiteFor({ ...siteFor, [w.id]: v })
+                    patch(w, { at_plant_id: v })
+                  }}
+                  className={
+                    'rounded-md border px-1.5 py-1 text-xs ' +
+                    (cur.at_plant_id === null ? 'border-amber-400 bg-amber-50 text-amber-800' : 'border-slate-300')
+                  }
+                  title="Which site were they at? The day is credited to that company."
+                >
+                  <option value="">pick a site</option>
+                  {plants.map((p) => <option key={p.id} value={p.id}>{p.short_name}</option>)}
+                </select>
+              </label>
+            )}
+          </div>
+        )}
       </li>
     )
   }

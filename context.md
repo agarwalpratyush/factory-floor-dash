@@ -150,6 +150,13 @@ than pretending to be unmarked. Nothing new is written with them. Do not delete
 those enum values or the pay branches that handle them — that would silently repay
 days already recorded.
 
+**A marked day opens its own detail.** Shift, overtime and — for group staff —
+which site they were at only appear once someone is marked present. An absent day
+has none of them, and showing five controls on a row nobody has touched yet is what
+made the page look heavy. Everything in that strip amends the existing row through
+one `patch()` helper, so a change is saved where it is made; the site picker used to
+set local state only and quietly lose its value.
+
 **Overtime is a right, not a bonus.** It is paid at `ff_plants.ot_multiplier`
 (default 2.00, the statutory rate) times the ordinary hourly rate, where ordinary
 hourly is the daily wage over `ff_plants.standard_day_hours` (default 8). Both sit
