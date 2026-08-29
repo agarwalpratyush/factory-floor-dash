@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useQuery } from '../lib/useQuery'
-import { Badge, Button, Card, Empty, ErrorBox, Field, inputCls, NeedPlant, PlantTag, Spinner, STAGE_TONE } from '../components/ui'
 import { usePlant, scopeKey, type PlantScope } from '../lib/plant'
 import { useAuth } from '../lib/auth'
+import {
+  Alert, Badge, Empty, ErrorBox, Field, Meter, NeedPlant, PlantTag,
+  Result, Section, Spinner, STAGE_STATE,
+} from '../components/ui'
 import { fmtDate, fmtMoney, fmtQty, today } from '../lib/format'
 import { ORDER_STAGES, STAGE_LABEL } from '../lib/types'
 import type { OrderItem, OrderProgress, OrderStage } from '../lib/types'
@@ -13,6 +16,7 @@ interface StageLogRow {
   from_stage: OrderStage | null
   to_stage: OrderStage
   changed_at: string
+  changed_by: string | null
   note: string | null
 }
 
@@ -34,17 +38,18 @@ async function loadDetail(orderId: number) {
   return { items: (items.data ?? []) as OrderItem[], log: (log.data ?? []) as StageLogRow[] }
 }
 
-function OrderDetail({ order, onChanged, canWrite }: { order: OrderProgress; onChanged: () => void; canWrite: boolean }) {
+function OrderDetail({
+  order, canWrite, money, onChanged,
+}: { order: OrderProgress; canWrite: boolean; money: boolean; onChanged: () => void }) {
   const { data, loading, error, refresh } = useQuery(() => loadDetail(order.id), 'detail-' + order.id)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
   const idx = ORDER_STAGES.indexOf(order.stage)
-  const nextStage = idx >= 0 && idx < ORDER_STAGES.length - 1 ? ORDER_STAGES[idx + 1] : null
+  const next = idx >= 0 && idx < ORDER_STAGES.length - 1 ? ORDER_STAGES[idx + 1] : null
 
   async function advance(to: OrderStage) {
-    setBusy(true)
-    setMsg(null)
+    setBusy(true); setMsg(null)
     const { error } = await supabase.from('ff_orders').update({ stage: to }).eq('id', order.id)
     setBusy(false)
     if (error) setMsg(error.message)
@@ -58,99 +63,83 @@ function OrderDetail({ order, onChanged, canWrite }: { order: OrderProgress; onC
   }
 
   return (
-    <div className="mt-3 rounded-lg bg-slate-50 p-4 ring-1 ring-slate-200">
-      {msg && <p className="mb-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{msg}</p>}
-
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium tracking-wide text-slate-500 uppercase">Stage</span>
-        {ORDER_STAGES.map((s, i) => (
-          <span
-            key={s}
-            className={
-              'rounded-full px-2.5 py-1 text-xs font-medium ' +
-              (i < idx ? 'bg-green-100 text-green-700'
-                : i === idx ? 'bg-blue-600 text-white'
-                : 'bg-white text-slate-400 ring-1 ring-slate-200')
-            }
-          >
-            {STAGE_LABEL[s]}
-          </span>
-        ))}
-        {nextStage && order.stage !== 'cancelled' && canWrite && (
-          <Button onClick={() => advance(nextStage)} disabled={busy} className="ml-auto">
-            Move to {STAGE_LABEL[nextStage]}
-          </Button>
+    <>
+      <Section title={'Order ' + order.order_no}>
+        <div className="row wrap">
+          {ORDER_STAGES.map((s, i) => (
+            <span key={s} className={'badge' + (i === idx ? ' is-ok' : i < idx ? '' : ' is-idle')}>
+              {STAGE_LABEL[s]}
+            </span>
+          ))}
+        </div>
+        {next && order.stage !== 'cancelled' && canWrite && (
+          <button type="button" className="btn btn-primary" disabled={busy} onClick={() => advance(next)}>
+            Move to {STAGE_LABEL[next]}
+          </button>
         )}
-      </div>
+        {msg && <Alert state="fail">{msg}</Alert>}
+        <div className="grid-2">
+          <Result label="Customer" value={<span style={{ fontSize: 'var(--text-body)' }}>{order.customer}</span>} flat />
+          <Result label="Due" value={<span style={{ fontSize: 'var(--text-body)' }}>{fmtDate(order.due_date)}</span>} flat />
+          {money && <Result label="Value" value={fmtMoney(order.value)} flat />}
+          <Result label="Complete" value={Number(order.pct_complete) + '%'} flat />
+        </div>
+      </Section>
 
-      {loading ? <Spinner label="Loading items…" /> : error ? <ErrorBox error={error} onRetry={refresh} /> : data && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div>
-            <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">Line items</h3>
-            <div className="scroll-x">
-              <table className="w-full min-w-[420px] text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-slate-500">
-                    <th className="pb-1.5 font-medium">Description</th>
-                    <th className="pb-1.5 text-right font-medium">Ordered</th>
-                    <th className="pb-1.5 text-right font-medium">Produced</th>
+      {loading ? <Spinner /> : error ? <ErrorBox error={error} onRetry={refresh} /> : data && (
+        <>
+          <Section title="Line items" flush>
+            <table className="table compact">
+              <thead>
+                <tr>
+                  <th>Description</th>
+                  <th className="n">Ordered</th>
+                  <th className="n">Made</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.items.map((it) => (
+                  <tr key={it.id}>
+                    <td>{it.description}</td>
+                    <td className="n">{fmtQty(it.qty)} {it.unit}</td>
+                    <td className="n">
+                      {canWrite ? (
+                        <input
+                          className="cell-input num" type="number"
+                          defaultValue={Number(it.qty_produced)} min={0} max={Number(it.qty)}
+                          onBlur={(e) => {
+                            const v = Number(e.target.value)
+                            if (v !== Number(it.qty_produced)) setProduced(it, v)
+                          }}
+                        />
+                      ) : fmtQty(it.qty_produced)}
+                    </td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {data.items.map((it) => (
-                    <tr key={it.id}>
-                      <td className="py-2 pr-2 text-slate-800">{it.description}</td>
-                      <td className="py-2 text-right tabular-nums text-slate-600">{fmtQty(it.qty)} {it.unit}</td>
-                      <td className="py-2 text-right">
-                        {canWrite ? (
-                          <input
-                            type="number"
-                            defaultValue={Number(it.qty_produced)}
-                            min={0}
-                            max={Number(it.qty)}
-                            onBlur={(e) => {
-                              const v = Number(e.target.value)
-                              if (v !== Number(it.qty_produced)) setProduced(it, v)
-                            }}
-                            className="w-24 rounded-md border border-slate-300 px-2 py-1 text-right text-sm tabular-nums"
-                          />
-                        ) : (
-                          <span className="tabular-nums text-slate-800">{fmtQty(it.qty_produced)}</span>
-                        )}
+                ))}
+              </tbody>
+            </table>
+          </Section>
+
+          <Section title="Stage history" flush>
+            {data.log.length === 0 ? <Empty>No history.</Empty> : (
+              <table className="table compact">
+                <tbody>
+                  {data.log.map((l) => (
+                    <tr key={l.id}>
+                      <td className="n faint">
+                        {new Date(l.changed_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
                       </td>
+                      <td className="muted">{l.from_stage ? STAGE_LABEL[l.from_stage] : '—'}</td>
+                      <td><Badge state={STAGE_STATE[l.to_stage]}>{STAGE_LABEL[l.to_stage]}</Badge></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
-            <p className="mt-2 text-xs text-slate-500">
-              {canWrite
-                ? 'Edit a produced figure and click away to save.'
-                : 'The order book is read-only for your account.'}
-            </p>
-          </div>
-
-          <div>
-            <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">Stage history</h3>
-            {data.log.length === 0 ? <Empty>No history.</Empty> : (
-              <ol className="space-y-2">
-                {data.log.map((l) => (
-                  <li key={l.id} className="flex items-center gap-2 text-sm">
-                    <span className="w-28 shrink-0 text-xs tabular-nums text-slate-500">
-                      {new Date(l.changed_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    <span className="text-slate-400">{l.from_stage ? STAGE_LABEL[l.from_stage] : '—'}</span>
-                    <span className="text-slate-400">→</span>
-                    <Badge tone={STAGE_TONE[l.to_stage]}>{STAGE_LABEL[l.to_stage]}</Badge>
-                    {l.note && <span className="text-xs text-slate-500">{l.note}</span>}
-                  </li>
-                ))}
-              </ol>
             )}
-          </div>
-        </div>
+          </Section>
+        </>
       )}
-    </div>
+    </>
   )
 }
 
@@ -164,8 +153,7 @@ function NewOrderForm({ plantId, onDone }: { plantId: number; onDone: () => void
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
-    setBusy(true)
-    setErr(null)
+    setBusy(true); setErr(null)
     const { error } = await supabase.from('ff_orders').insert({
       plant_id: plantId,
       order_no: f.order_no.trim(),
@@ -183,40 +171,21 @@ function NewOrderForm({ plantId, onDone }: { plantId: number; onDone: () => void
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      <Field label="Order no *">
-        <input required value={f.order_no} onChange={(e) => setF({ ...f, order_no: e.target.value })} className={inputCls} placeholder="SO-2609" />
-      </Field>
-      <Field label="Customer *">
-        <input required value={f.customer} onChange={(e) => setF({ ...f, customer: e.target.value })} className={inputCls} />
-      </Field>
-      <Field label="Customer PO ref">
-        <input value={f.po_ref} onChange={(e) => setF({ ...f, po_ref: e.target.value })} className={inputCls} />
-      </Field>
-      <Field label="Site / project">
-        <input value={f.site} onChange={(e) => setF({ ...f, site: e.target.value })} className={inputCls} />
-      </Field>
-      <Field label="Order date">
-        <input type="date" value={f.order_date} onChange={(e) => setF({ ...f, order_date: e.target.value })} className={inputCls} />
-      </Field>
-      <Field label="Due date">
-        <input type="date" value={f.due_date} onChange={(e) => setF({ ...f, due_date: e.target.value })} className={inputCls} />
-      </Field>
+    <form onSubmit={submit} className="stack">
+      <Field label="Order no"><input className="input mono" required value={f.order_no} onChange={(e) => setF({ ...f, order_no: e.target.value })} /></Field>
+      <Field label="Customer"><input className="input" required value={f.customer} onChange={(e) => setF({ ...f, customer: e.target.value })} /></Field>
+      <Field label="Customer PO ref"><input className="input mono" value={f.po_ref} onChange={(e) => setF({ ...f, po_ref: e.target.value })} /></Field>
+      <Field label="Site or project"><input className="input" value={f.site} onChange={(e) => setF({ ...f, site: e.target.value })} /></Field>
+      <Field label="Order date"><input className="input" type="date" value={f.order_date} onChange={(e) => setF({ ...f, order_date: e.target.value })} /></Field>
+      <Field label="Due date"><input className="input" type="date" value={f.due_date} onChange={(e) => setF({ ...f, due_date: e.target.value })} /></Field>
       <Field label="Priority">
-        <select value={f.priority} onChange={(e) => setF({ ...f, priority: e.target.value })} className={inputCls}>
-          <option value="low">Low</option>
-          <option value="normal">Normal</option>
-          <option value="high">High</option>
-          <option value="urgent">Urgent</option>
+        <select className="select" value={f.priority} onChange={(e) => setF({ ...f, priority: e.target.value })}>
+          {['low', 'normal', 'high', 'urgent'].map((p) => <option key={p} value={p}>{p}</option>)}
         </select>
       </Field>
-      <Field label="Order value (₹)">
-        <input type="number" step="0.01" value={f.value} onChange={(e) => setF({ ...f, value: e.target.value })} className={inputCls} />
-      </Field>
-      {err && <p className="text-sm text-red-600 sm:col-span-2 lg:col-span-4">{err}</p>}
-      <div className="sm:col-span-2 lg:col-span-4">
-        <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Create order'}</Button>
-      </div>
+      <Field label="Order value"><input className="input num" type="number" step="0.01" value={f.value} onChange={(e) => setF({ ...f, value: e.target.value })} /></Field>
+      {err && <Alert state="fail">{err}</Alert>}
+      <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Place order'}</button>
     </form>
   )
 }
@@ -225,11 +194,9 @@ export default function Orders() {
   const { scope, plant, byId } = usePlant()
   const { can } = useAuth()
   const money = can('ff_money')
-  // Taking and changing an order is a commercial decision, held separately from
-  // the shop-floor manage rights.
   const writeOrders = can('ff_orders_write')
   const { data, loading, error, refresh } = useQuery(() => loadOrders(scope), 'orders-' + scopeKey(scope))
-  const [stage, setStage] = useState<string>('open')
+  const [stage, setStage] = useState('open')
   const [q, setQ] = useState('')
   const [openId, setOpenId] = useState<number | null>(null)
   const [showNew, setShowNew] = useState(false)
@@ -243,98 +210,109 @@ export default function Orders() {
     return r
   }, [data, stage, q])
 
+  const selected = rows.find((o) => o.id === openId) ?? null
+  const open = (data ?? []).filter((o) => o.stage !== 'delivered' && o.stage !== 'cancelled')
+  const overdue = open.filter((o) => o.days_to_due !== null && Number(o.days_to_due) < 0)
+
   return (
-    <div className="space-y-5">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">Orders</h1>
-          <p className="text-sm text-slate-500">{rows.length} shown · {(data ?? []).length} total</p>
-        </div>
-        {plant && writeOrders && (
-          <Button variant={showNew ? 'ghost' : 'primary'} onClick={() => setShowNew((s) => !s)}>
-            {showNew ? 'Cancel' : '+ New order'}
-          </Button>
+    <>
+      <div className="col w-sm">
+        <span className="label">Orders</span>
+        <Result label="Open" value={open.length} sub={money ? fmtMoney(open.reduce((s, o) => s + Number(o.value ?? 0), 0)) : undefined} />
+        <Result label="Overdue" value={overdue.length} state={overdue.length ? 'fail' : 'ok'} />
+        <Result label="Shown" value={rows.length} sub={(data ?? []).length + ' in total'} flat />
+
+        <hr className="divider" />
+        <Field label="Search">
+          <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Order, customer, site" />
+        </Field>
+        <Field label="Stage">
+          <select className="select" value={stage} onChange={(e) => setStage(e.target.value)}>
+            <option value="open">Open only</option>
+            <option value="all">All stages</option>
+            {ORDER_STAGES.map((s) => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </Field>
+
+        {writeOrders && plant && (
+          <button type="button" className={'btn' + (showNew ? '' : ' btn-primary')} onClick={() => setShowNew((s) => !s)}>
+            {showNew ? 'Cancel' : 'Place order'}
+          </button>
         )}
-      </header>
-
-      {showNew && plant && (
-        <Card title={'New order · ' + plant.short_name}>
-          <NewOrderForm plantId={plant.id} onDone={() => { setShowNew(false); refresh() }} />
-        </Card>
-      )}
-      {!plant && writeOrders && <NeedPlant what="add an order" />}
-      {!writeOrders && (
-        <p className="rounded-lg bg-slate-50 px-4 py-3 text-sm text-slate-600 ring-1 ring-slate-200">
-          Orders are read-only for your account. Placing an order, moving its stage and
-          recording produced quantities are all done by the owner.
-        </p>
-      )}
-
-      <div className="flex flex-wrap gap-2">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search order no, customer, site…"
-          className={inputCls + ' sm:max-w-xs'}
-        />
-        <select value={stage} onChange={(e) => setStage(e.target.value)} className={inputCls + ' sm:max-w-[200px]'}>
-          <option value="open">Open only</option>
-          <option value="all">All stages</option>
-          {ORDER_STAGES.map((s) => <option key={s} value={s}>{STAGE_LABEL[s]}</option>)}
-          <option value="cancelled">Cancelled</option>
-        </select>
+        {writeOrders && !plant && <NeedPlant what="place an order" />}
+        {!writeOrders && (
+          <Alert state="info">
+            Read-only. Placing an order, moving its stage and recording made quantities are done
+            by the owner.
+          </Alert>
+        )}
       </div>
 
-      {loading ? <Spinner /> : error ? <ErrorBox error={error} onRetry={refresh} /> : rows.length === 0 ? (
-        <Card><Empty>No orders match.</Empty></Card>
-      ) : (
-        <div className="space-y-3">
-          {rows.map((o) => {
-            const late = o.days_to_due !== null && Number(o.days_to_due) < 0 && o.stage !== 'delivered'
-            return (
-              <Card key={o.id} className={late ? 'ring-red-200' : ''}>
-                <div
-                  className="flex cursor-pointer flex-wrap items-start justify-between gap-3"
-                  onClick={() => setOpenId(openId === o.id ? null : o.id)}
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {scope === 'group' && <PlantTag code={byId(o.plant_id)?.code} />}
-                      <span className="font-semibold text-slate-900">{o.order_no}</span>
-                      <Badge tone={STAGE_TONE[o.stage]}>{STAGE_LABEL[o.stage]}</Badge>
-                      {o.priority === 'urgent' && <Badge tone="red">Urgent</Badge>}
-                      {o.priority === 'high' && <Badge tone="amber">High</Badge>}
-                      {late && <Badge tone="red">{Math.abs(Number(o.days_to_due))}d overdue</Badge>}
-                    </div>
-                    <p className="mt-0.5 text-sm text-slate-700">{o.customer}</p>
-                    {o.site && <p className="text-xs text-slate-500">{o.site}</p>}
-                  </div>
-                  <div className="flex shrink-0 gap-6 text-right text-sm">
-                    <div>
-                      <div className="text-xs text-slate-500">Due</div>
-                      <div className={'tabular-nums ' + (late ? 'font-semibold text-red-600' : 'text-slate-800')}>{fmtDate(o.due_date)}</div>
-                    </div>
-                    {money && (
-                      <div>
-                        <div className="text-xs text-slate-500">Value</div>
-                        <div className="tabular-nums text-slate-800">{fmtMoney(o.value)}</div>
-                      </div>
-                    )}
-                    <div className="w-24">
-                      <div className="text-xs text-slate-500">Produced</div>
-                      <div className="tabular-nums text-slate-800">{Number(o.pct_complete)}%</div>
-                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                        <div className="h-full rounded-full bg-blue-600" style={{ width: Math.min(100, Number(o.pct_complete)) + '%' }} />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                {openId === o.id && <OrderDetail order={o} onChanged={refresh} canWrite={writeOrders} />}
-              </Card>
-            )
-          })}
-        </div>
-      )}
-    </div>
+      <div className="col fill flush">
+        {loading ? <Spinner /> : error ? <div style={{ padding: 8 }}><ErrorBox error={error} onRetry={refresh} /></div> : rows.length === 0 ? (
+          <Empty>No orders match.</Empty>
+        ) : (
+          <div className="table-wrap">
+            <table className="table">
+              <thead>
+                <tr>
+                  {scope === 'group' && <th>Unit</th>}
+                  <th>Order</th>
+                  <th>Customer</th>
+                  <th>Site</th>
+                  <th>Stage</th>
+                  <th className="n">Made</th>
+                  <th style={{ width: 72 }} />
+                  {money && <th className="n">Value</th>}
+                  <th className="n">Due</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((o) => {
+                  const late = o.days_to_due !== null && Number(o.days_to_due) < 0 && o.stage !== 'delivered'
+                  return (
+                    <tr
+                      key={o.id}
+                      onClick={() => setOpenId(openId === o.id ? null : o.id)}
+                      style={{ cursor: 'pointer', background: openId === o.id ? 'var(--accent-bg)' : undefined }}
+                    >
+                      {scope === 'group' && <td><PlantTag code={byId(o.plant_id)?.code} /></td>}
+                      <td className="mono">{o.order_no}</td>
+                      <td>{o.customer}</td>
+                      <td className="muted">{o.site ?? '—'}</td>
+                      <td>
+                        <Badge state={STAGE_STATE[o.stage]}>{STAGE_LABEL[o.stage]}</Badge>
+                        {o.priority === 'urgent' && <span className="badge is-fail" style={{ marginLeft: 4 }}>urgent</span>}
+                      </td>
+                      <td className="n">{Number(o.pct_complete)}%</td>
+                      <td><Meter pct={Number(o.pct_complete)} state={Number(o.pct_complete) >= 100 ? 'ok' : undefined} /></td>
+                      {money && <td className="n">{fmtMoney(o.value)}</td>}
+                      <td className="n">
+                        {late
+                          ? <span className="badge is-fail">{Math.abs(Number(o.days_to_due))}d late</span>
+                          : fmtDate(o.due_date)}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="col w-md">
+        {showNew && plant && writeOrders ? (
+          <Section title={'New order · ' + plant.short_name}>
+            <NewOrderForm plantId={plant.id} onDone={() => { setShowNew(false); refresh() }} />
+          </Section>
+        ) : selected ? (
+          <OrderDetail order={selected} canWrite={writeOrders} money={money} onChanged={refresh} />
+        ) : (
+          <Empty>Select an order to see its lines and stage history.</Empty>
+        )}
+      </div>
+    </>
   )
 }

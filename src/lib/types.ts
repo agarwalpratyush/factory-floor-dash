@@ -289,7 +289,8 @@ export const TXN_TYPE_LABEL: Record<TxnType, string> = {
   adjustment: 'Adjustment',
 }
 
-/** Saffron runs one coating line with a handful of hands; Agarwal has real departments. */
+/** Departments a company offers, keyed by its plant code. A coating line runs on a
+ *  handful of hands; a fabrication site has real departments. */
 export const DEPTS_BY_PLANT: Record<string, string[]> = {
   SAF: ['extrusion', 'general', 'maintenance'],
   AGI: ['mesh', 'assembly', 'packing', 'dispatch', 'maintenance', 'qc'],
