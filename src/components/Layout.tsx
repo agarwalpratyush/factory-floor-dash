@@ -31,29 +31,47 @@ function PlantSwitcher() {
     )
   }
 
-  return (
-    <div className="space-y-1">
+  const companyBtn = (p: (typeof plants)[number]) => (
+    <button
+      key={p.id}
+      onClick={() => setScope(p.id)}
+      className={
+        'w-full rounded-lg px-3 py-2 text-left text-sm leading-snug font-medium transition ' +
+        (scope === p.id ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white')
+      }
+    >
+      {p.name}
+    </button>
+  )
+
+  // Combined sits between the companies it joins, with a rule running through it,
+  // so the grouping is visible rather than described.
+  const combined = (
+    <div key="combined" className="relative flex justify-center py-1">
+      <span aria-hidden className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-slate-700" />
       <button
         onClick={() => setScope('group')}
+        aria-pressed={scope === 'group'}
         className={
-          'w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition ' +
-          (scope === 'group' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white')
+          'relative rounded-md px-2 py-0.5 text-xs font-medium tracking-wide transition ' +
+          (scope === 'group'
+            ? 'bg-slate-700 text-white ring-1 ring-slate-500'
+            : 'bg-slate-900 text-slate-400 ring-1 ring-slate-700 hover:text-white')
         }
       >
-        Combined View
+        Combined
       </button>
-      {plants.map((p) => (
-        <button
-          key={p.id}
-          onClick={() => setScope(p.id)}
-          className={
-            'w-full rounded-lg px-3 py-2 text-left text-sm leading-snug font-medium transition ' +
-            (scope === p.id ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white')
-          }
-        >
-          {p.name}
-        </button>
-      ))}
+    </div>
+  )
+
+  // With two companies this lands exactly in the middle of them.
+  const mid = Math.floor(plants.length / 2)
+
+  return (
+    <div className="space-y-1">
+      {plants.slice(0, mid).map(companyBtn)}
+      {combined}
+      {plants.slice(mid).map(companyBtn)}
     </div>
   )
 }

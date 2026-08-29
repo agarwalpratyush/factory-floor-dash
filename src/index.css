@@ -69,8 +69,10 @@
   --color-slate-400: var(--text-faint);
   --color-slate-500: var(--text-muted);
   --color-slate-600: var(--text-muted);
-  --color-slate-700: var(--text);
-  --color-slate-800: var(--text);
+  /* The sidebar is a dark surface and needs its own steps. Derived from the two
+     dark tokens rather than invented, so the palette still has one source. */
+  --color-slate-700: color-mix(in srgb, var(--text) 72%, var(--text-muted));
+  --color-slate-800: color-mix(in srgb, var(--text) 88%, var(--text-muted));
   --color-slate-900: var(--text);
 
   /* Accent. Steel teal rather than green, so green keeps meaning "pass". */
