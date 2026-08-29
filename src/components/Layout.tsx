@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePlant } from '../lib/plant'
 import { useAuth, type Perm } from '../lib/auth'
 
@@ -25,7 +25,7 @@ function PlantSwitcher() {
   if (pinned !== null) {
     const p = plants.find((x) => x.id === pinned)
     return (
-      <div className="rounded-lg bg-slate-800 px-3 py-2">
+      <div className="rounded-lg bg-slate-800 px-3 py-2 text-center">
         <div className="text-sm font-medium text-white">{p?.name ?? 'Your company'}</div>
       </div>
     )
@@ -76,10 +76,71 @@ function PlantSwitcher() {
   )
 }
 
+function ProfileMenu() {
+  const { me, can, signOut } = useAuth()
+  const [open, setOpen] = useState(false)
+  const box = useRef<HTMLDivElement>(null)
+
+  // Close on a click anywhere else, and on Escape.
+  useEffect(() => {
+    if (!open) return
+    const away = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false)
+    }
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', away)
+    document.addEventListener('keydown', esc)
+    return () => {
+      document.removeEventListener('mousedown', away)
+      document.removeEventListener('keydown', esc)
+    }
+  }, [open])
+
+  return (
+    <div className="relative" ref={box}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="max-w-[220px] truncate rounded-lg px-3 py-1.5 text-sm text-slate-300 ring-1 ring-slate-700 transition hover:bg-slate-800 hover:text-white"
+      >
+        {me?.full_name || me?.email}
+      </button>
+
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 z-20 mt-1 w-64 rounded-lg bg-white py-1 shadow-lg ring-1 ring-slate-200"
+        >
+          <div className="px-3 py-2">
+            <div className="truncate text-sm font-medium text-slate-900">{me?.email}</div>
+            <div className="text-xs text-slate-500">
+              {me?.role_label ?? me?.role}
+              {!can('ff_money') && ' · no cost access'}
+              {!can('ff_orders_write') && ' · orders read-only'}
+            </div>
+          </div>
+          <hr className="my-1 border-slate-200" />
+          <button
+            role="menuitem"
+            onClick={() => { setOpen(false); signOut() }}
+            className="w-full px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50"
+          >
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Layout() {
   const [open, setOpen] = useState(false)
-  const { plant, scope, pinned } = usePlant()
-  const { me, can, signOut } = useAuth()
+  const { can } = useAuth()
+
+  // Refresh remounts the page below, so whichever screen is showing re-runs its
+  // own queries. One control rather than a Refresh button on every page.
+  const [tick, setTick] = useState(0)
 
   const nav = NAV.filter((n) => can(n.need))
 
@@ -87,61 +148,51 @@ export default function Layout() {
     'block rounded-lg px-3 py-2 text-sm font-medium transition ' +
     (isActive ? 'bg-blue-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-white')
 
-  const scopeLabel = pinned !== null
-    ? plant?.short_name
-    : scope === 'group' ? 'Combined View' : plant?.short_name
-
   return (
-    <div className="min-h-full lg:flex">
-      <div className="flex items-center justify-between bg-slate-900 px-4 py-3 lg:hidden">
-        <div>
-          <span className="font-semibold text-white">Factory Floor</span>
-          <span className="ml-2 text-xs text-slate-400">{scopeLabel}</span>
-        </div>
+    <div className="flex min-h-full flex-col">
+      <header className="flex items-center gap-3 border-b border-slate-700 bg-slate-900 px-4 py-2">
         <button
           onClick={() => setOpen((o) => !o)}
-          className="rounded-lg px-3 py-2 text-sm text-slate-200 ring-1 ring-slate-700"
           aria-expanded={open}
+          className="rounded-lg px-2 py-1.5 text-sm text-slate-300 ring-1 ring-slate-700 lg:hidden"
         >
           {open ? 'Close' : 'Menu'}
         </button>
-      </div>
 
-      <aside className={(open ? 'block ' : 'hidden ') + 'bg-slate-900 px-3 pb-4 lg:flex lg:w-60 lg:shrink-0 lg:flex-col lg:px-3 lg:py-5'}>
-        <div className="mb-4 hidden px-2 lg:block">
-          <div className="text-base font-semibold text-white">Factory Floor</div>
-        </div>
+        <span className="text-base font-semibold text-white">Factory Floor</span>
 
-        <PlantSwitcher />
+        <span className="flex-1" />
 
-        <hr className="my-4 border-slate-700" />
+        <button
+          onClick={() => setTick((t) => t + 1)}
+          className="rounded-lg px-3 py-1.5 text-sm text-slate-300 ring-1 ring-slate-700 transition hover:bg-slate-800 hover:text-white"
+        >
+          Refresh
+        </button>
 
-        <nav className="space-y-1" onClick={() => setOpen(false)}>
-          {nav.map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.end} className={link}>
-              {n.label}
-            </NavLink>
-          ))}
-        </nav>
+        <ProfileMenu />
+      </header>
 
-        <div className="mt-4 border-t border-slate-700 pt-3 lg:mt-auto">
-          <div className="truncate px-2 text-xs text-slate-300">{me?.full_name || me?.email}</div>
-          <div className="px-2 text-xs text-slate-500">
-            {me?.role_label ?? me?.role}
-            {!can('ff_money') && ' · no cost access'}
+      <div className="flex min-h-0 flex-1 lg:flex-row">
+        <aside className={(open ? 'block ' : 'hidden ') + 'bg-slate-900 px-3 pb-4 lg:block lg:w-60 lg:shrink-0 lg:py-5'}>
+          <PlantSwitcher />
+          <hr className="my-4 border-slate-700" />
+          <nav className="space-y-1" onClick={() => setOpen(false)}>
+            {nav.map((n) => (
+              <NavLink key={n.to} to={n.to} end={n.end} className={link}>
+                {n.label}
+              </NavLink>
+            ))}
+          </nav>
+        </aside>
+
+        <main className="min-w-0 flex-1 p-4 lg:p-6">
+          {/* Changing the key remounts the page, which re-runs its queries. */}
+          <div key={tick}>
+            <Outlet />
           </div>
-          <button
-            onClick={signOut}
-            className="mt-2 w-full rounded-lg px-3 py-2 text-left text-sm text-slate-400 transition hover:bg-slate-800 hover:text-white"
-          >
-            Sign out
-          </button>
-        </div>
-      </aside>
-
-      <main className="min-w-0 flex-1 p-4 lg:p-6">
-        <Outlet />
-      </main>
+        </main>
+      </div>
     </div>
   )
 }

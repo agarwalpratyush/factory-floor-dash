@@ -169,9 +169,6 @@ export default function Dashboard() {
             {plant && ' · ' + plant.city + ', ' + plant.state}
           </p>
         </div>
-        <button onClick={refresh} className="rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50">
-          Refresh
-        </button>
       </header>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
