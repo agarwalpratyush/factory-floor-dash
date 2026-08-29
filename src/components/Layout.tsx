@@ -26,7 +26,7 @@ function PlantSwitcher() {
     const p = plants.find((x) => x.id === pinned)
     return (
       <div className="rounded-lg bg-slate-800 px-3 py-2">
-        <div className="text-sm font-medium text-white">{p?.short_name ?? 'Your company'}</div>
+        <div className="text-sm font-medium text-white">{p?.name ?? 'Your company'}</div>
       </div>
     )
   }
@@ -48,11 +48,11 @@ function PlantSwitcher() {
           key={p.id}
           onClick={() => setScope(p.id)}
           className={
-            'w-full rounded-lg px-3 py-2 text-left text-sm font-medium transition ' +
+            'w-full rounded-lg px-3 py-2 text-left text-sm leading-snug font-medium transition ' +
             (scope === p.id ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white')
           }
         >
-          {p.short_name}
+          {p.name}
         </button>
       ))}
     </div>
