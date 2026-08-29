@@ -11,6 +11,9 @@ Vite + React + TypeScript + Tailwind v4, talking straight to Supabase Postgres.
 
 **Live:** https://agarwalpratyush.github.io/factory-floor-dash/
 
+Read [context.md](context.md) before changing anything — it holds the decisions and
+traps that the code does not explain.
+
 ## Running it
 
 ```bash

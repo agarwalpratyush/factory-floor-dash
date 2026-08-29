@@ -1,0 +1,194 @@
+# Context
+
+What someone needs to know before changing this, that the code does not say.
+Read this first; the README covers how to run and deploy it.
+
+> **This repository is public.** GitHub Pages will not serve a private repo on a
+> free plan. Nothing personal goes in this file: no employee names, no wages, no
+> phone numbers, no customer list. Roles and structure only. Check anything you add
+> against that before committing.
+
+**Maintain this file.** When a decision here stops being true, change it in the same
+commit that makes it untrue. A stale context file is worse than none, because the
+next person will trust it.
+
+---
+
+## What this is
+
+Shop-floor tracking for two manufacturing companies that feed each other.
+
+| | Takes in | Puts out |
+|---|---|---|
+| **Coating company** (`SAF`) | GI wire rolls, PVC granules | PVC coated GI wire |
+| **Fabrication company** (`AGI`) | GI wire rolls, coated wire **from SAF** | DT mesh rolls → gabion boxes |
+
+Supply runs **one way only**: SAF → AGI. AGI never sends material back.
+
+Everything lives in the existing `gabion-intel` Supabase project under an `ff_`
+prefix, kept apart from the `in_` / `bt_` / `bh_` tender-intel tables that share it.
+
+---
+
+## The decisions that matter
+
+**Stock is derived, never stored.** `ff_stock_levels` computes
+`opening + in − out` per (plant, material) on read. There is no running total to
+drift out of sync with the ledger. Every balance traces to `ff_material_txns`.
+
+**Raw vs finished depends on where, not what.** Coated wire is the coating
+company's *finished product* and the fabrication company's *raw material*. So
+`ff_material_plants.role` (`raw` / `wip` / `finished`) sits on the (material,
+plant) pair, not on the material. `ff_materials.category` is only the article's
+general nature. Reorder levels apply to `raw` alone — the rest are produced to
+demand.
+
+**Business facts live in data, not code.** Three things that look like they belong
+in `if` statements are rows instead, because they change:
+
+| Fact | Where |
+|---|---|
+| Which company runs which process | `ff_plants.processes` (`coating`, `fabrication`) |
+| Which company a login may see | `staff.plant_id` (NULL = both) |
+| Who may supply whom | `ff_supply_routes` |
+
+Never hard-code a plant code to express one of these. A new process or route should
+be one `UPDATE`.
+
+**Compound writes go through database functions.** Anything that moves stock on
+more than one side is a single transaction in Postgres, so it can never be
+half-posted:
+
+| Function | Posts |
+|---|---|
+| `ff_record_production` | The run, its inputs, an `in` for the output, an `out` per input |
+| `ff_record_coil_log` | A whole coating shift, its coils, and the three movements it implies |
+| `ff_record_outward` | A load leaving, plus `sale_out` (customer) or `transfer_out` (our other company) |
+| `ff_receive_outward` | `transfer_in` at the receiving company, closing the load |
+| `ff_set_dispatch_status` | Returns and cancellations, putting goods back |
+
+**Never insert into `ff_production`, `ff_dispatches` or `ff_coil_logs` directly** —
+stock would not move. `ff_order_stage_log` works the same way, via a trigger.
+
+**Outward movement is one register.** A customer dispatch and a load to our other
+company are the same event — a lorry leaving with a challan. Both are
+`ff_dispatches` rows separated by `kind`. The only real differences: where it is
+going, and whether someone has to confirm it arrived. A load between companies
+belongs to neither while it is on the road; the receiving side books it in.
+
+**Dates are the factory's, not the server's.** Postgres runs on UTC, which rolls
+over at 05:30 IST and would file a late-evening entry under the previous working
+day. Use `ff_today()`, never `current_date`. The client mirrors this with a local
+date, not `toISOString()`.
+
+**Warn, do not block, on negative stock.** Back-dated and corrective entries are
+normal on a floor, and a hard block teaches people to fudge the number. Negative
+balances are counted separately on the Stock page so a genuine ledger error stays
+visible instead of hiding inside a low-stock count.
+
+---
+
+## The coating register
+
+The floor keeps the coating line on paper, one row per coil: GI weight, GI
+diameter, coated weight, coated diameter — plus a size heading and a note of power
+cuts. `ff_coil_logs` + `ff_coil_entries` mirror that sheet exactly.
+
+Two things fall out of it that the paper cannot give you:
+
+- **Granule consumption without weighing anything.** Nobody weighs the PVC that
+  goes onto a coil, but coated weight minus GI weight *is* the granules. A sample
+  shift derived 267.810 kg at 19.41% pickup from 1,380.020 kg of wire.
+- **Transcription errors, caught on entry.** Per-coil pickup clusters tightly
+  around the shift mean, so a coil far off it is almost always a slipped digit
+  rather than a process event. Transcribe what the register says and let the system
+  flag it; never silently correct the source document.
+
+A coating shift also posts an `ff_production` row underneath, which is why
+Production shows one run log for both companies and only the entry form differs.
+
+---
+
+## Access
+
+Login is required; with no session every `ff_` table returns zero rows. This reuses
+the project's existing `staff` / `roles` / `has_perm()` system rather than adding a
+second one. `roles.permissions` is a jsonb map.
+
+| Permission | Grants |
+|---|---|
+| `ff_view` | Read dashboards, stock, orders, production |
+| `ff_entry` | Record attendance, shift logs, production, material movements |
+| `ff_manage` | Dispatches, transfers, material and worker masters |
+| `ff_money` | See costs, rates and wages |
+| `ff_backdate` | Enter a date other than today |
+| `ff_orders_write` | Place or change an order — owner only |
+
+Shop-floor staff have **no** access: entry is a manager's job. Three rules are
+enforced in RLS, not the interface:
+
+1. **No back-dating or post-dating** without `ff_backdate`.
+2. **Only the author may edit** — entry tables carry `created_by`, defaulted to
+   `current_email()`. Rows written before this existed have a null `created_by` and
+   are admin-only, which is the safe default.
+3. **Company scoping** via `ff_can_see_plant()`, which deliberately returns false
+   for NULL-plant rows: group staff belong to no company, so a scoped login has no
+   business seeing them.
+
+> ⚠ **`roles.permissions` is shared with the other tools and has been wiped before.**
+> An edit from the group dashboard replaced the whole jsonb object and dropped every
+> `ff_*` key, which silently left this app admin-only — nothing errored, queries just
+> returned nothing. Always check `select role, permissions from roles` before trusting
+> permission behaviour, and always restore with `permissions || jsonb_build_object(...)`
+> so the other tools' keys survive.
+
+---
+
+## People
+
+Both companies are owner-operator sized — under ten on the rolls in total. Anything
+that assumes departmental headcount, shift rosters or an HR hierarchy is wrong by an
+order of magnitude: one operator runs a whole coating line.
+
+- **Group staff** (`ff_workers.plant_id IS NULL`) cover both companies. They are
+  marked in the **combined view only**, get one attendance row per day because they
+  are one person, and record which site they were at via `at_plant_id`.
+- **Daily-wage labour** is hired by the day and cannot be named rows. It lives in
+  `ff_daily_labour` as a head count and rate per site per day.
+- Department groupings switch off below `DEPT_GROUPING_MIN` heads, because with
+  three people the headings are noise.
+
+---
+
+## Design
+
+The interface follows a supplied tool-design brief. The token block at the top of
+`src/index.css` is the source of truth:
+
+- IBM Plex Sans and Plex Mono, 13px body, 2px corners, hairline rules
+- **No hex outside the token block.** Anything needing a colour in script reads it
+  through `token()` in `src/lib/tokens.ts`
+- **Colour reports state and nothing else** — green pass, amber review, red fail.
+  Anything else is grey. Violet and cyan are mapped to grey for this reason
+- Tailwind's palette, fonts and radii are remapped onto the tokens with
+  `@theme inline`, so existing markup picks up the design without classes changing
+
+The brief also specifies a layout pattern (app bar, tabs, three columns). **That was
+deliberately not adopted** — the sidebar and page structure are the app's own. Apply
+the surface, not the information architecture.
+
+---
+
+## Still open
+
+- **Most seeded data is invented.** The two companies, the staff, the permissions and
+  one transcribed coil log are real. Customer orders, suppliers, purchases, dispatch
+  records and every opening balance are placeholder. Do not present them as findings.
+  Four early dispatches have no line items and never moved stock; they cannot be
+  backfilled because nothing records which article left.
+- **`ff_money` is not a hard boundary.** It hides money in the interface and RLS
+  filters rows, but a signed-in user could still read a money column through the
+  REST API. Real column enforcement needs masking views plus revoking base-table
+  SELECT.
+- **Print is written but unverified.** `@media print` rules exist; nobody has run
+  Ctrl+P on a production log.
