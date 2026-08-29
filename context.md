@@ -150,12 +150,22 @@ than pretending to be unmarked. Nothing new is written with them. Do not delete
 those enum values or the pay branches that handle them — that would silently repay
 days already recorded.
 
-**A marked day opens its own detail.** Shift, overtime and — for group staff —
-which site they were at only appear once someone is marked present. An absent day
-has none of them, and showing five controls on a row nobody has touched yet is what
-made the page look heavy. Everything in that strip amends the existing row through
-one `patch()` helper, so a change is saved where it is made; the site picker used to
-set local state only and quietly lose its value.
+**A marked day keeps its detail behind a button.** Shift, overtime and — for group
+staff — which site they were at sit behind a small **Details** toggle that appears
+only once someone is marked present. An absent day has none of them, and a row is
+usually left alone after P is pressed, so the strip stays shut until asked for. The
+toggle turns amber when a group person's day is credited to no company, because that
+is the one thing in there nobody can be trusted to remember. Everything in the strip
+amends the existing row through one `patch()` helper, so a change is saved where it
+is made; the site picker used to set local state only and quietly lose its value.
+
+Which rows are open is held in the page component, not in `WorkerRow` — that is
+declared inside `Attendance` and so remounts on every render, which is also why the
+overtime input is uncontrolled.
+
+**General is the default shift.** Most people here are not on a rota at all, so `G`
+is what both column defaults give and what a new worker's form starts on. `A` (day)
+and `B` (night) are for someone actually working a shift.
 
 **Overtime is a right, not a bonus.** It is paid at `ff_plants.ot_multiplier`
 (default 2.00, the statutory rate) times the ordinary hourly rate, where ordinary

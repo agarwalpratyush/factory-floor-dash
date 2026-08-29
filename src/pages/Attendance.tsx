@@ -78,7 +78,7 @@ function NewWorkerForm({
   const depts = plantCode ? DEPTS_BY_PLANT[plantCode] ?? ALL_DEPTS : ALL_DEPTS
   const [f, setF] = useState({
     code: '', name: '', phone: '', dept: depts[0],
-    designation: DESIGNATIONS[0], shift_default: 'A', daily_wage: '', notes: '',
+    designation: DESIGNATIONS[0], shift_default: 'G', daily_wage: '', notes: '',
     group: false,
   })
   const [busy, setBusy] = useState(false)
@@ -212,6 +212,9 @@ export default function Attendance() {
   const [saving, setSaving] = useState<number | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [siteFor, setSiteFor] = useState<Record<number, number>>({})
+  // Which rows have their detail strip open. Held here rather than in WorkerRow,
+  // which is declared inside this component and so remounts on every render.
+  const [openRow, setOpenRow] = useState<Record<number, boolean>>({})
 
   const day = useQuery(() => loadDay(scope, date), 'att-' + scopeKey(scope) + '-' + date)
   const month = useQuery(() => loadMonth(daysAgo(29)), 'att-month')
@@ -392,7 +395,26 @@ export default function Attendance() {
         )}
         {!cur && <Badge tone="amber">not marked</Badge>}
 
-        {cur?.status === 'present' && (
+        {cur?.status === 'present' && (() => {
+          const needsSite = isGroup && cur.at_plant_id === null
+          return (
+            <button
+              onClick={() => setOpenRow({ ...openRow, [w.id]: !openRow[w.id] })}
+              aria-expanded={!!openRow[w.id]}
+              title={needsSite ? 'No site picked - this day is credited to neither company' : 'Shift, overtime and site'}
+              className={
+                'rounded-md px-2 py-1 text-xs ring-1 transition ' +
+                (needsSite
+                  ? 'bg-amber-50 text-amber-800 ring-amber-300'
+                  : 'text-slate-500 ring-slate-300 hover:bg-slate-100')
+              }
+            >
+              Details{needsSite && ' ·'}
+            </button>
+          )
+        })()}
+
+        {cur?.status === 'present' && openRow[w.id] && (
           <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-200 pt-2 text-xs text-slate-500">
             <label className="flex items-center gap-1.5">
               Shift
