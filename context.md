@@ -142,6 +142,14 @@ enforced in RLS, not the interface:
 > permission behaviour, and always restore with `permissions || jsonb_build_object(...)`
 > so the other tools' keys survive.
 
+**Attendance is present or absent.** Five buttons on every row made a simple
+question look hard, so the surface offers `P` and `A` only. `half_day`, `leave` and
+`week_off` remain in the enum: rows already carrying them still read back and still
+price correctly (half a day pays half), and the row shows the recorded status rather
+than pretending to be unmarked. Nothing new is written with them. Do not delete
+those enum values or the pay branches that handle them — that would silently repay
+days already recorded.
+
 **Overtime is a right, not a bonus.** It is paid at `ff_plants.ot_multiplier`
 (default 2.00, the statutory rate) times the ordinary hourly rate, where ordinary
 hourly is the daily wage over `ff_plants.standard_day_hours` (default 8). Both sit

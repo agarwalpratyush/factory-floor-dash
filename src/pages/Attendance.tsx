@@ -13,7 +13,10 @@ import {
 } from '../lib/types'
 import type { Attendance as Att, AttendanceStatus, DailyLabour, Worker } from '../lib/types'
 
-const STATUSES: AttendanceStatus[] = ['present', 'half_day', 'absent', 'leave', 'week_off']
+/** Present or absent is the whole question on a floor this size, and five buttons
+ *  on every row made it look harder than it is. Half day, leave and week off remain
+ *  in the enum and still read back correctly where they were already recorded. */
+const STATUSES: AttendanceStatus[] = ['present', 'absent']
 
 /** Overtime is paid at twice the ordinary hourly rate on an eight hour day. The
  *  database holds these per company on ff_plants; these mirror the defaults. */
@@ -296,7 +299,6 @@ export default function Attendance() {
 
   const marked = workers.filter((w) => byWorker.has(w.id)).length
   const present = workers.filter((w) => byWorker.get(w.id)?.status === 'present').length
-  const half = workers.filter((w) => byWorker.get(w.id)?.status === 'half_day').length
   const absent = workers.filter((w) => byWorker.get(w.id)?.status === 'absent').length
 
   const labour = day.data?.labour ?? []
@@ -408,6 +410,14 @@ export default function Attendance() {
         ) : (
           <span className="text-xs text-slate-400" title="Managers do not draw overtime">no OT</span>
         )}
+        {cur && !STATUSES.includes(cur.status) && (
+          <span
+            className="text-xs text-slate-500"
+            title={'Recorded as ' + ATTENDANCE_LABEL[cur.status] + ' before this was simplified. Mark P or A to replace it.'}
+          >
+            {ATTENDANCE_LABEL[cur.status]}
+          </span>
+        )}
         {!cur && <Badge tone="amber">not marked</Badge>}
       </li>
     )
@@ -448,7 +458,7 @@ export default function Attendance() {
           sub={marked < workers.length ? (workers.length - marked) + ' still to mark' : 'all done'}
           tone={marked < workers.length ? 'warn' : 'good'}
         />
-        <Stat label="Present" value={present} sub={half + ' half day · ' + absent + ' absent'} tone="good" />
+        <Stat label="Present" value={present} sub={absent + ' absent'} tone="good" />
         <Stat
           label="Daily-wage labour"
           value={casual || '—'}
@@ -519,17 +529,6 @@ export default function Attendance() {
                 </p>
               </div>
             )}
-
-            <div className="flex flex-wrap gap-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
-              {STATUSES.map((s) => (
-                <span key={s} className="inline-flex items-center gap-1.5">
-                  <span className={'inline-flex h-5 w-5 items-center justify-center rounded text-[11px] font-semibold ' + STATUS_BTN[s]}>
-                    {STATUS_SHORT[s]}
-                  </span>
-                  {ATTENDANCE_LABEL[s]}
-                </span>
-              ))}
-            </div>
           </div>
         )}
       </Card>
