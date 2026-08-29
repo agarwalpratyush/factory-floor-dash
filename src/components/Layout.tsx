@@ -12,8 +12,8 @@ import { ACCOUNTS_URL } from '../lib/brand'
 const NAV: { to: string; label: string; end?: boolean; need: Perm }[] = [
   { to: '/', label: 'Dashboard', end: true, need: 'ff_view' },
   { to: '/orders', label: 'Orders', need: 'ff_view' },
-  { to: '/production', label: 'Production', need: 'ff_view' },
   { to: '/materials', label: 'Materials', need: 'ff_view' },
+  { to: '/production', label: 'Production', need: 'ff_view' },
   { to: '/stock', label: 'Stock', need: 'ff_view' },
   { to: '/dispatch', label: 'Dispatch', need: 'ff_manage' },
   { to: '/attendance', label: 'Attendance', need: 'ff_view' },
