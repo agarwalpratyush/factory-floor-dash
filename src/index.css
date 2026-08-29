@@ -156,3 +156,14 @@ input, select, textarea { font-size: 16px; }
   tr { break-inside: avoid; }
   a { color: var(--text); text-decoration: none; }
 }
+
+/* One turn of the refresh arrow. A remount is instant and silent, so without
+   the old text label this is the only sign the click registered. */
+@keyframes ff-turn {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.ff-turn { animation: ff-turn 0.5s ease-in-out; }
+@media (prefers-reduced-motion: reduce) {
+  .ff-turn { animation: none; }
+}

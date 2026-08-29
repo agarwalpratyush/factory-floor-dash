@@ -218,6 +218,7 @@ export default function Layout() {
   // Refresh remounts the page below, so whichever screen is showing re-runs its
   // own queries. One control rather than a Refresh button on every page.
   const [tick, setTick] = useState(0)
+  const [spin, setSpin] = useState(false)
 
   const nav = NAV.filter((n) => can(n.need))
 
@@ -241,10 +242,27 @@ export default function Layout() {
         <span className="flex-1" />
 
         <button
-          onClick={() => setTick((t) => t + 1)}
-          className="rounded-lg px-3 py-1.5 text-sm text-slate-300 ring-1 ring-slate-700 transition hover:bg-slate-800 hover:text-white"
+          onClick={() => {
+            setTick((t) => t + 1)
+            setSpin(true)
+            // On a timer rather than animationend, which never fires for a
+            // reader who has asked for reduced motion.
+            setTimeout(() => setSpin(false), 500)
+          }}
+          aria-label="Refresh"
+          title="Refresh"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-300 ring-1 ring-slate-700 transition hover:bg-slate-800 hover:text-white"
         >
-          Refresh
+          {/* A remount is instant and silent. Without the label, one turn of the
+              arrow is the only sign the click registered. */}
+          <svg
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}
+            strokeLinecap="round" strokeLinejoin="round" aria-hidden
+            className={'h-4 w-4' + (spin ? ' ff-turn' : '')}
+          >
+            <path d="M20 11a8 8 0 1 0-.6 4" />
+            <path d="M20 4v6h-6" />
+          </svg>
         </button>
 
         <ProfileMenu />
