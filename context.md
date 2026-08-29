@@ -163,6 +163,29 @@ Which rows are open is held in the page component, not in `WorkerRow` — that i
 declared inside `Attendance` and so remounts on every render, which is also why the
 overtime input is uncontrolled.
 
+**A worker profile is editable; the days behind it are not.** Everything on
+`ff_workers` can be changed except `code` — the code is how a person is identified
+on the paper register and on every day already recorded, so it is read-only once the
+row exists. Two routes by which an edit could have reached backwards are closed:
+
+- **The wage is stamped onto the day.** `ff_attendance_pay` used to read the
+  worker's *current* `daily_wage`, so a raise repriced every day that person had
+  ever worked. `ff_attendance.day_wage` is now filled in by
+  `ff_stamp_attendance_facts()` when the row is written, and the view prefers it. A
+  raise applies from the day it is given. The trigger only ever fills a null, never
+  overwrites, so amending a row keeps the day's own facts. Rows written before this
+  were backfilled from the wage then in force.
+- **The company is stamped too.** `at_plant_id` is set for everyone now, not just
+  group staff, and the view reads `coalesce(a.at_plant_id, w.plant_id)`. Moving
+  someone between companies no longer moves their history with them.
+
+**Deleting a worker is refused once they have days recorded.** The foreign key was
+`on delete cascade`, so removing someone erased every day they had ever worked; it
+is now `on delete restrict`. Somebody leaving is not a reason to lose the record of
+their work — untick *On the rolls* (`active`) instead, which takes them off the
+floor and keeps it. A worker with no days can still be deleted outright, which is
+what makes a mistyped new entry easy to undo.
+
 **Clock times are shown, not applied.** `in_time` and `out_time` sit in the details
 strip beside the shift, and the strip reports the span between them — wrapping past
 midnight, because the night shift runs 20:00 to 08:00 and a naive subtraction gives

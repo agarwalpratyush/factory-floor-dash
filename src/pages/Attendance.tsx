@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useQuery } from '../lib/useQuery'
 import { usePlant, scopeKey, type PlantScope } from '../lib/plant'
@@ -85,43 +85,108 @@ async function loadMonth(from: string) {
   return (data ?? []) as Pick<Att, 'worker_id' | 'status' | 'ot_hours' | 'work_date'>[]
 }
 
-function NewWorkerForm({
-  plantId, plantCode, onDone,
-}: { plantId: number | null; plantCode: string | null; onDone: () => void }) {
+/**
+ * One form for adding a worker and for editing one. The worker code is the only
+ * thing that cannot change: it is how a person is identified on paper, on the
+ * coating register, and on every day already recorded against them.
+ *
+ * Nothing edited here reaches a day already recorded. The wage in force is stamped
+ * onto each attendance row as it is written, so a raise applies from the day it is
+ * given rather than repricing the month behind it, and a worker with days on the
+ * books cannot be deleted at all - the database refuses it.
+ */
+function WorkerForm({
+  plantId, plantCode, worker, onDone,
+}: {
+  plantId: number | null
+  plantCode: string | null
+  worker?: Worker
+  onDone: () => void
+}) {
+  const editing = worker !== undefined
   const depts = plantCode ? DEPTS_BY_PLANT[plantCode] ?? ALL_DEPTS : ALL_DEPTS
   const [f, setF] = useState({
-    code: '', name: '', phone: '', dept: depts[0],
-    designation: DESIGNATIONS[0], shift_default: 'G', daily_wage: '', notes: '',
-    group: false,
+    code: worker?.code ?? '',
+    name: worker?.name ?? '',
+    phone: worker?.phone ?? '',
+    dept: worker?.dept ?? depts[0],
+    designation: worker?.designation ?? DESIGNATIONS[0],
+    shift_default: worker?.shift_default ?? 'G',
+    daily_wage: worker?.daily_wage != null ? String(worker.daily_wage) : '',
+    date_joined: worker?.date_joined ?? today(),
+    notes: worker?.notes ?? '',
+    group: editing ? worker.plant_id === null : false,
+    ot_eligible: worker?.ot_eligible ?? true,
+    active: worker?.active ?? true,
   })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
+
+  // How many days already stand against this person. It decides whether they can
+  // be removed at all, so it is worth knowing before the button is offered.
+  const [days, setDays] = useState<number | null>(null)
+  useEffect(() => {
+    if (!worker) return
+    let live = true
+    supabase
+      .from('ff_attendance')
+      .select('id', { count: 'exact', head: true })
+      .eq('worker_id', worker.id)
+      .then(({ count }) => { if (live) setDays(count ?? 0) })
+    return () => { live = false }
+  }, [worker])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     setErr(null)
-    const { error } = await supabase.from('ff_workers').insert({
-      plant_id: f.group ? null : plantId,
-      code: f.code.trim().toUpperCase(),
+    const fields = {
+      // A group person belongs to no company; otherwise they keep the one they
+      // are already on, and a new worker joins the company being viewed.
+      plant_id: f.group ? null : worker ? worker.plant_id ?? plantId : plantId,
       name: f.name.trim(),
       phone: f.phone.trim() || null,
       dept: f.dept,
       designation: f.designation,
       shift_default: f.shift_default,
       daily_wage: f.daily_wage ? Number(f.daily_wage) : null,
+      date_joined: f.date_joined || null,
       notes: f.notes.trim() || null,
-      date_joined: today(),
-    })
+      ot_eligible: f.ot_eligible,
+      active: f.active,
+    }
+    const { error } = worker
+      ? await supabase.from('ff_workers').update(fields).eq('id', worker.id)
+      : await supabase.from('ff_workers').insert({ ...fields, code: f.code.trim().toUpperCase() })
     setBusy(false)
     if (error) setErr(error.message)
     else onDone()
   }
 
+  async function remove() {
+    if (!worker) return
+    setBusy(true)
+    setErr(null)
+    const { error } = await supabase.from('ff_workers').delete().eq('id', worker.id)
+    setBusy(false)
+    setConfirming(false)
+    if (error) setErr(error.message + ' - if days are recorded against them, take them off the rolls instead.')
+    else onDone()
+  }
+
   return (
     <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      <Field label="Worker code *">
-        <input required value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} className={inputCls} placeholder="A-04" />
+      <Field label={editing ? 'Worker code (cannot change)' : 'Worker code *'}>
+        <input
+          required={!editing}
+          readOnly={editing}
+          value={f.code}
+          onChange={(e) => setF({ ...f, code: e.target.value })}
+          className={inputCls + (editing ? ' bg-slate-100 text-slate-500' : '')}
+          title={editing ? 'The code identifies this person on paper and on every day already recorded' : undefined}
+          placeholder="A-04"
+        />
       </Field>
       <Field label="Name *">
         <input required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={inputCls} />
@@ -147,16 +212,52 @@ function NewWorkerForm({
       <Field label="Daily wage (₹)">
         <input type="number" step="1" value={f.daily_wage} onChange={(e) => setF({ ...f, daily_wage: e.target.value })} className={inputCls} placeholder="leave blank if not fixed" />
       </Field>
+      <Field label="Date joined">
+        <input type="date" value={f.date_joined} onChange={(e) => setF({ ...f, date_joined: e.target.value })} className={inputCls} />
+      </Field>
       <Field label="Notes">
         <input value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} className={inputCls} placeholder="name to be confirmed…" />
       </Field>
+
       <label className="flex items-end gap-2 pb-2 text-sm text-slate-700">
         <input type="checkbox" checked={f.group} onChange={(e) => setF({ ...f, group: e.target.checked })} className="h-4 w-4 rounded" />
         Group staff (oversees both companies)
       </label>
+      <label className="flex items-end gap-2 pb-2 text-sm text-slate-700">
+        <input type="checkbox" checked={f.ot_eligible} onChange={(e) => setF({ ...f, ot_eligible: e.target.checked })} className="h-4 w-4 rounded" />
+        Draws overtime
+      </label>
+      <label className="flex items-end gap-2 pb-2 text-sm text-slate-700">
+        <input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} className="h-4 w-4 rounded" />
+        On the rolls
+      </label>
+
       {err && <p className="text-sm text-red-600 sm:col-span-2 lg:col-span-3">{err}</p>}
-      <div className="sm:col-span-2 lg:col-span-3">
-        <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Add worker'}</Button>
+
+      <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
+        <Button type="submit" disabled={busy}>
+          {busy ? 'Saving…' : editing ? 'Save changes' : 'Add worker'}
+        </Button>
+        {editing && <Button type="button" variant="ghost" onClick={onDone}>Cancel</Button>}
+
+        {editing && days !== null && days > 0 && (
+          <span className="ml-auto text-xs text-slate-500">
+            {days} day{days === 1 ? '' : 's'} recorded, so this person cannot be deleted.
+            Untick <em>On the rolls</em> to take them off the floor and keep the record.
+          </span>
+        )}
+        {editing && days === 0 && !confirming && (
+          <Button type="button" variant="ghost" className="ml-auto text-red-700" onClick={() => setConfirming(true)}>
+            Delete worker
+          </Button>
+        )}
+        {editing && days === 0 && confirming && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-600">Delete {worker.name} for good?</span>
+            <Button type="button" variant="ghost" onClick={() => setConfirming(false)}>No</Button>
+            <Button type="button" variant="danger" disabled={busy} onClick={remove}>Delete</Button>
+          </div>
+        )}
       </div>
     </form>
   )
@@ -228,6 +329,8 @@ export default function Attendance() {
   // Which rows have their detail strip open. Held here rather than in WorkerRow,
   // which is declared inside this component and so remounts on every render.
   const [openRow, setOpenRow] = useState<Record<number, boolean>>({})
+  // Whose profile is open for editing. One at a time - it is a whole form.
+  const [editId, setEditId] = useState<number | null>(null)
 
   const day = useQuery(() => loadDay(scope, date), 'att-' + scopeKey(scope) + '-' + date)
   const month = useQuery(() => loadMonth(daysAgo(29)), 'att-month')
@@ -409,6 +512,17 @@ export default function Attendance() {
         )}
         {!cur && <Badge tone="amber">not marked</Badge>}
 
+        {manage && (
+          <button
+            onClick={() => setEditId(editId === w.id ? null : w.id)}
+            aria-expanded={editId === w.id}
+            title={'Edit ' + w.name + "'s profile"}
+            className="rounded-md px-2 py-1 text-xs text-slate-500 ring-1 ring-slate-300 transition hover:bg-slate-100"
+          >
+            Edit
+          </button>
+        )}
+
         {cur && (() => {
           const needsSite = isGroup && cur.status === 'present' && cur.at_plant_id === null
           return (
@@ -550,6 +664,17 @@ export default function Attendance() {
             </label>
           </div>
         )}
+
+        {editId === w.id && (
+          <div className="w-full border-t border-slate-200 pt-3">
+            <WorkerForm
+              plantId={w.plant_id ?? plant?.id ?? null}
+              plantCode={w.plant_id !== null ? byId(w.plant_id)?.code ?? null : null}
+              worker={w}
+              onDone={() => { setEditId(null); day.refresh() }}
+            />
+          </div>
+        )}
       </li>
     )
   }
@@ -575,7 +700,7 @@ export default function Attendance() {
 
       {showNew && plant && (
         <Card title={'New worker · ' + plant.short_name}>
-          <NewWorkerForm plantId={plant.id} plantCode={plant.code} onDone={() => { setShowNew(false); day.refresh() }} />
+          <WorkerForm plantId={plant.id} plantCode={plant.code} onDone={() => { setShowNew(false); day.refresh() }} />
         </Card>
       )}
       {!plant && <NeedPlant what="add a worker or record daily labour" />}
