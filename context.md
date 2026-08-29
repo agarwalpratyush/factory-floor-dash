@@ -159,8 +159,10 @@ set local state only and quietly lose its value.
 
 **Overtime is a right, not a bonus.** It is paid at `ff_plants.ot_multiplier`
 (default 2.00, the statutory rate) times the ordinary hourly rate, where ordinary
-hourly is the daily wage over `ff_plants.standard_day_hours` (default 8). Both sit
-on the company so a site can differ. `ff_workers.ot_eligible` decides who draws it —
+hourly is the daily wage over `ff_plants.standard_day_hours`. **Both sites run
+twelve hour shifts**, so that is 12, not the 8 an eight-hour day would imply - a
+daily wage buys twelve hours here, and a hand on 300 a day is worth 25 an hour, not
+37.50. Both numbers sit on the company so a site can differ. `ff_workers.ot_eligible` decides who draws it —
 managers do not, because they are salaried for the job rather than the hour. A
 trigger refuses overtime hours on an ineligible worker however they are written, and
 `ff_attendance_pay` computes what a day is worth.

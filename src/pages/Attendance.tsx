@@ -18,9 +18,10 @@ import type { Attendance as Att, AttendanceStatus, DailyLabour, Worker } from '.
  *  in the enum and still read back correctly where they were already recorded. */
 const STATUSES: AttendanceStatus[] = ['present', 'absent']
 
-/** Overtime is paid at twice the ordinary hourly rate on an eight hour day. The
- *  database holds these per company on ff_plants; these mirror the defaults. */
-const STANDARD_DAY_HOURS = 8
+/** Both sites run twelve hour shifts, so a daily wage buys twelve hours and the
+ *  ordinary hourly rate is a twelfth of it. Overtime pays twice that. The database
+ *  holds both per company on ff_plants; these mirror the defaults. */
+const STANDARD_DAY_HOURS = 12
 const OT_MULTIPLIER = 2
 
 const STATUS_BTN: Record<AttendanceStatus, string> = {
@@ -315,7 +316,7 @@ export default function Attendance() {
     return sum + mult * Number(w.daily_wage ?? 0)
   }, 0)
 
-  // Overtime at twice the ordinary hourly rate, on an eight hour day.
+  // Overtime at twice the ordinary hourly rate, on a twelve hour day.
   const otHours = workers.reduce((sum, w) => sum + Number(byWorker.get(w.id)?.ot_hours ?? 0), 0)
   const otPay = workers.reduce((sum, w) => {
     const h = Number(byWorker.get(w.id)?.ot_hours ?? 0)

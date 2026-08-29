@@ -320,9 +320,12 @@ export const ALL_DEPTS = [
   'qc', 'packing', 'dispatch', 'maintenance',
 ]
 
+/** Twelve hour shifts, so the day is split two ways and not three. The stored
+ *  codes are unchanged - 'A' has always been the day shift - so rows written under
+ *  the old eight hour labels still mean what they say. 'C' is gone; it was never
+ *  used. 'G' is for group staff, who are not on a shift at all. */
 export const SHIFTS = [
-  { value: 'A', label: 'A (08:00–17:00)' },
-  { value: 'B', label: 'B (14:00–22:00)' },
-  { value: 'C', label: 'C (22:00–06:00)' },
+  { value: 'A', label: 'Day (08:00–20:00)' },
+  { value: 'B', label: 'Night (20:00–08:00)' },
   { value: 'G', label: 'General' },
 ]
