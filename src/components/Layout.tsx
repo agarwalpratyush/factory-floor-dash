@@ -15,8 +15,8 @@ const NAV: { to: string; label: string; end?: boolean; need: Perm }[] = [
   { to: '/production', label: 'Production', need: 'ff_view' },
   { to: '/materials', label: 'Materials', need: 'ff_view' },
   { to: '/stock', label: 'Stock', need: 'ff_view' },
-  { to: '/attendance', label: 'Attendance', need: 'ff_view' },
   { to: '/dispatch', label: 'Dispatch', need: 'ff_manage' },
+  { to: '/attendance', label: 'Attendance', need: 'ff_view' },
   // Money end to end, so it is not offered to a login that cannot see money.
   { to: '/accounts', label: 'Accounts', need: 'ff_money' },
 ]
