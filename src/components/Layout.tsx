@@ -88,7 +88,16 @@ function ProfileMenu() {
   // only the header button shortens it, where space is tight.
   const fullName = me?.full_name?.trim() || ''
   const headline = fullName || me?.email || 'Account'
-  const buttonLabel = fullName || me?.email?.split('@')[0] || 'Account'
+
+  // A mark rather than a name: an address is too long for the bar, and the menu
+  // carries the identity anyway. Two words give first and last initial; otherwise
+  // the first two letters of whatever we have.
+  const initials = (() => {
+    const parts = fullName.split(/\s+/).filter(Boolean)
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    const base = fullName || me?.email?.split('@')[0] || ''
+    return base.slice(0, 2).toUpperCase() || '?'
+  })()
 
   const scope = pinned !== null
     ? plants.find((p) => p.id === pinned)?.name ?? 'One company'
@@ -124,9 +133,16 @@ function ProfileMenu() {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="max-w-[180px] truncate rounded-lg px-3 py-1.5 text-sm text-slate-300 ring-1 ring-slate-700 transition hover:bg-slate-800 hover:text-white"
+        aria-label={'Account' + (me?.email ? ': ' + me.email : '')}
+        title={me?.email ?? undefined}
+        className={
+          'flex h-8 w-8 items-center justify-center rounded-lg text-xs font-semibold ring-1 transition ' +
+          (open
+            ? 'bg-slate-700 text-white ring-slate-500'
+            : 'bg-slate-800 text-slate-200 ring-slate-700 hover:bg-slate-700 hover:text-white')
+        }
       >
-        {buttonLabel}
+        {initials}
       </button>
 
       {open && (
