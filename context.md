@@ -163,6 +163,14 @@ Which rows are open is held in the page component, not in `WorkerRow` — that i
 declared inside `Attendance` and so remounts on every render, which is also why the
 overtime input is uncontrolled.
 
+**Clock times are shown, not applied.** `in_time` and `out_time` sit in the details
+strip beside the shift, and the strip reports the span between them — wrapping past
+midnight, because the night shift runs 20:00 to 08:00 and a naive subtraction gives
+a negative day. Where that span runs past `standard_day_hours` the excess is
+flagged, but it is never written into `ot_hours`: what the clock says and what
+someone is paid overtime for are two decisions, and only the second is a manager's
+to make. Deriving one from the other would quietly turn a late finish into a wage.
+
 **A remark is the reason the row reads the way it does**, so it belongs to any
 marked day, present or absent — which is why the Details toggle appears on both,
 even though shift, overtime and site are present-only. A remark that has been

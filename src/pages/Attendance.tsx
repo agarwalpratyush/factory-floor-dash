@@ -24,6 +24,19 @@ const STATUSES: AttendanceStatus[] = ['present', 'absent']
 const STANDARD_DAY_HOURS = 12
 const OT_MULTIPLIER = 2
 
+/** Postgres hands back a time as HH:MM:SS; the input wants HH:MM. */
+const hhmm = (t: string | null) => (t ? t.slice(0, 5) : '')
+
+/** Hours between clocking in and clocking out. A night shift runs 20:00 to 08:00,
+ *  so an out time at or before the in time is the next morning, not a negative day. */
+function spanHours(inT: string | null, outT: string | null): number | null {
+  if (!inT || !outT) return null
+  const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
+  let d = mins(outT) - mins(inT)
+  if (d <= 0) d += 24 * 60
+  return d / 60
+}
+
 const STATUS_BTN: Record<AttendanceStatus, string> = {
   present: 'bg-green-600 text-white ring-green-600',
   half_day: 'bg-amber-500 text-white ring-amber-500',
@@ -429,6 +442,50 @@ export default function Attendance() {
                 {SHIFTS.map((sh) => <option key={sh.value} value={sh.value}>{sh.label}</option>)}
               </select>
             </label>
+
+            <label className="flex items-center gap-1.5">
+              In
+              <input
+                type="time"
+                defaultValue={hhmm(cur.in_time)}
+                disabled={saving === w.id}
+                onBlur={(e) => {
+                  const v = e.target.value || null
+                  if (v !== hhmm(cur.in_time) && !(v === null && !cur.in_time)) patch(w, { in_time: v })
+                }}
+                className="rounded-md border border-slate-300 px-1.5 py-1 tabular-nums"
+              />
+            </label>
+
+            <label className="flex items-center gap-1.5">
+              Out
+              <input
+                type="time"
+                defaultValue={hhmm(cur.out_time)}
+                disabled={saving === w.id}
+                onBlur={(e) => {
+                  const v = e.target.value || null
+                  if (v !== hhmm(cur.out_time) && !(v === null && !cur.out_time)) patch(w, { out_time: v })
+                }}
+                className="rounded-md border border-slate-300 px-1.5 py-1 tabular-nums"
+              />
+            </label>
+
+            {(() => {
+              // Shown, not applied. What the clock says and what someone is paid
+              // overtime for are two decisions, and only one of them is a manager's.
+              const span = spanHours(cur.in_time, cur.out_time)
+              if (span === null) return null
+              const over = span - STANDARD_DAY_HOURS
+              return (
+                <span className="tabular-nums" title="Time between clocking in and out">
+                  {fmtNum(span, 1)}h on the clock
+                  {over > 0.01 && w.ot_eligible && (
+                    <span className="text-amber-700"> · {fmtNum(over, 1)}h over</span>
+                  )}
+                </span>
+              )
+            })()}
 
             {w.ot_eligible ? (
               <label className="flex items-center gap-1.5">
