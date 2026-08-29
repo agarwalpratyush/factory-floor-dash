@@ -10,6 +10,7 @@ import Production from './pages/Production'
 import Materials from './pages/Materials'
 import Stock from './pages/Stock'
 import Attendance from './pages/Attendance'
+import Accounts from './pages/Accounts'
 import Dispatch from './pages/Dispatch'
 
 function Gate() {
@@ -50,6 +51,7 @@ function Gate() {
             <Route path="materials" element={<Materials />} />
             <Route path="stock" element={<Stock />} />
             <Route path="attendance" element={<Attendance />} />
+            <Route path="accounts" element={<Accounts />} />
             <Route path="dispatch" element={<Dispatch />} />
           </Route>
         </Routes>

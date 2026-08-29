@@ -135,6 +135,13 @@ enforced in RLS, not the interface:
    for NULL-plant rows: group staff belong to no company, so a scoped login has no
    business seeing them.
 
+> ⚠ **A view must be created `with (security_invoker = on)`.** Without it a view runs
+> as its owner and quietly bypasses the row level security on the tables underneath.
+> Every `ff_` view sets it. `ff_attendance_pay` lost the option when it was rebuilt
+> with `drop view` / `create view` — which exposed wages past the policies on
+> `ff_attendance` — and had to have it put back. Check `reloptions` in `pg_class`
+> after rebuilding any view.
+
 > ⚠ **`roles.permissions` is shared with the other tools and has been wiped before.**
 > An edit from the group dashboard replaced the whole jsonb object and dropped every
 > `ff_*` key, which silently left this app admin-only — nothing errored, queries just
@@ -213,6 +220,34 @@ daily wage buys twelve hours here, and a hand on 300 a day is worth 25 an hour, 
 managers do not, because they are salaried for the job rather than the hour. A
 trigger refuses overtime hours on an ineligible worker however they are written, and
 `ff_attendance_pay` computes what a day is worth.
+
+---
+
+## Accounts
+
+Cash that moves without touching stock. Three accounts exist and nothing else does:
+a float held by a group manager, and one expense account per company.
+
+**An imprest is not an expense account**, which is why `ff_accounts.kind` exists
+rather than one table of signed amounts. A float is advanced to a person, topped up
+and spent down, and its balance is money that should still be in their pocket — a
+number somebody can be asked to account for. An expense account only ever goes out;
+it has no balance worth showing, so the page shows spend instead. The entry form
+follows: only an imprest is asked which direction the money went.
+
+Balances are derived on read in `ff_account_balances`, the same rule stock follows.
+Group-level accounts (`plant_id is null`) appear in the combined view only, the same
+rule group staff follow.
+
+The whole tab is behind `ff_money`, both in the sidebar and in RLS — it is money end
+to end, so there is no useful read-only view of it for someone who may not see money.
+
+**The page says what it is not.** A *Yet to be configured* card lists what does not
+exist: opening balances, an agreed chart of accounts, bank and cash accounts,
+receivables and payables, approval and reimbursement, and any notion of a period or
+month end. `category` is deliberately free text — inventing a list of headings would
+produce tidy totals before anyone had agreed what the headings mean. Say what is
+missing rather than shipping an empty statement that implies it is coming.
 
 ---
 

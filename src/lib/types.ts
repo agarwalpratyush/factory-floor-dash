@@ -132,6 +132,50 @@ export interface Attendance {
   remarks: string | null
 }
 
+/** An imprest is a float advanced to a person; an expense account only goes out. */
+export type AccountKind = 'imprest' | 'expense'
+
+export interface Account {
+  id: number
+  code: string
+  name: string
+  kind: AccountKind
+  /** Null is group level - the account belongs to neither company. */
+  plant_id: number | null
+  holder: string | null
+  active: boolean
+}
+
+export interface AccountTxn {
+  id: number
+  account_id: number
+  txn_date: string
+  direction: 'in' | 'out'
+  amount: number
+  description: string
+  paid_to: string | null
+  /** Free text until a chart of accounts is agreed. */
+  category: string | null
+  recorded_by: string | null
+  created_by: string | null
+}
+
+/** Derived on read, like stock: no stored total to drift out of step. */
+export interface AccountBalance {
+  account_id: number
+  code: string
+  name: string
+  kind: AccountKind
+  plant_id: number | null
+  holder: string | null
+  active: boolean
+  total_in: number
+  total_out: number
+  balance: number
+  entries: number
+  last_entry: string | null
+}
+
 export interface Order {
   id: number
   plant_id: number
