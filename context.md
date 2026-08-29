@@ -142,6 +142,14 @@ enforced in RLS, not the interface:
 > permission behaviour, and always restore with `permissions || jsonb_build_object(...)`
 > so the other tools' keys survive.
 
+**Overtime is a right, not a bonus.** It is paid at `ff_plants.ot_multiplier`
+(default 2.00, the statutory rate) times the ordinary hourly rate, where ordinary
+hourly is the daily wage over `ff_plants.standard_day_hours` (default 8). Both sit
+on the company so a site can differ. `ff_workers.ot_eligible` decides who draws it —
+managers do not, because they are salaried for the job rather than the hour. A
+trigger refuses overtime hours on an ineligible worker however they are written, and
+`ff_attendance_pay` computes what a day is worth.
+
 ---
 
 ## People

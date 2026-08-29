@@ -15,6 +15,11 @@ import type { Attendance as Att, AttendanceStatus, DailyLabour, Worker } from '.
 
 const STATUSES: AttendanceStatus[] = ['present', 'half_day', 'absent', 'leave', 'week_off']
 
+/** Overtime is paid at twice the ordinary hourly rate on an eight hour day. The
+ *  database holds these per company on ff_plants; these mirror the defaults. */
+const STANDARD_DAY_HOURS = 8
+const OT_MULTIPLIER = 2
+
 const STATUS_BTN: Record<AttendanceStatus, string> = {
   present: 'bg-green-600 text-white ring-green-600',
   half_day: 'bg-amber-500 text-white ring-amber-500',
@@ -253,6 +258,19 @@ export default function Attendance() {
     else { day.refresh(); month.refresh() }
   }
 
+  async function setOt(worker: Worker, hours: number) {
+    setSaving(worker.id)
+    setErr(null)
+    const { error } = await supabase
+      .from('ff_attendance')
+      .update({ ot_hours: hours })
+      .eq('work_date', date)
+      .eq('worker_id', worker.id)
+    setSaving(null)
+    if (error) setErr(error.message)
+    else { day.refresh(); month.refresh() }
+  }
+
   async function markAllPresent() {
     const unmarked = (day.data?.workers ?? []).filter((w) => !byWorker.has(w.id))
     if (unmarked.length === 0) return
@@ -291,7 +309,16 @@ export default function Attendance() {
     const mult = s === 'present' ? 1 : s === 'half_day' ? 0.5 : 0
     return sum + mult * Number(w.daily_wage ?? 0)
   }, 0)
-  const wageBill = rollWage + casualCost
+
+  // Overtime at twice the ordinary hourly rate, on an eight hour day.
+  const otHours = workers.reduce((sum, w) => sum + Number(byWorker.get(w.id)?.ot_hours ?? 0), 0)
+  const otPay = workers.reduce((sum, w) => {
+    const h = Number(byWorker.get(w.id)?.ot_hours ?? 0)
+    if (!h || !w.daily_wage) return sum
+    return sum + h * (Number(w.daily_wage) / STANDARD_DAY_HOURS) * OT_MULTIPLIER
+  }, 0)
+
+  const wageBill = rollWage + otPay + casualCost
   const anyCost = anyWage || casualCost > 0
 
   // Department headings are noise below DEPT_GROUPING_MIN heads, and both companies
@@ -361,6 +388,26 @@ export default function Attendance() {
             )
           })}
         </div>
+        {w.ot_eligible ? (
+          <label className="flex items-center gap-1 text-xs text-slate-500">
+            OT
+            <input
+              type="number" min={0} max={12} step={0.5}
+              defaultValue={Number(cur?.ot_hours ?? 0) || ''}
+              disabled={!cur || saving === w.id}
+              onBlur={(e) => {
+                const v = Number(e.target.value || 0)
+                if (v !== Number(cur?.ot_hours ?? 0)) setOt(w, v)
+              }}
+              placeholder="0"
+              title={cur ? 'Overtime hours' : 'Mark attendance first'}
+              className="w-14 rounded-md border border-slate-300 px-1.5 py-1 text-right text-xs tabular-nums disabled:bg-slate-50"
+            />
+            h
+          </label>
+        ) : (
+          <span className="text-xs text-slate-400" title="Managers do not draw overtime">no OT</span>
+        )}
         {!cur && <Badge tone="amber">not marked</Badge>}
       </li>
     )
@@ -411,7 +458,11 @@ export default function Attendance() {
           <Stat
             label="Wage bill today"
             value={anyCost ? '₹' + fmtNum(wageBill, 0) : '—'}
-            sub={anyCost ? 'rolls + casual' : 'no rates recorded'}
+            sub={anyCost
+              ? 'rolls + casual' + (otHours > 0
+                  ? ' + ' + fmtNum(otHours, 1) + 'h overtime ₹' + fmtNum(otPay, 0)
+                  : '')
+              : 'no rates recorded'}
           />
         ) : (
           <Stat label="Absent" value={absent} tone={absent ? 'bad' : 'good'} />

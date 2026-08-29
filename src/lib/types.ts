@@ -109,6 +109,8 @@ export interface Worker {
   phone: string | null
   dept: string
   designation: string | null
+  /** Managers are salaried for the job, not the hour, so they draw no overtime. */
+  ot_eligible: boolean
   notes: string | null
   shift_default: string
   daily_wage: number | null
