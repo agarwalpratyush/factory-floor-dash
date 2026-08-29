@@ -11,15 +11,15 @@ type NavItem = { to: string; label: string; end?: boolean; need: Perm }
  * Production is one tab everywhere: the log reads the same at both companies, and
  * only the entry form changes with the company's process.
  *
- * The middle group is the path material takes, in the order it takes it. It is set
- * apart because those five tabs are one story - a promise, what arrives, what is
- * made of it, what is left, what leaves - while the tabs above and below answer
- * questions of their own.
+ * The middle group is manufacturing: the path material takes, in the order it takes
+ * it. It is set apart because those five tabs are one story - a promise, what
+ * arrives, what is made of it, what is left, what leaves - while the tabs above
+ * and below answer questions of their own.
  */
 const NAV: { label?: string; items: NavItem[] }[] = [
   { items: [{ to: '/', label: 'Dashboard', end: true, need: 'ff_view' }] },
   {
-    label: 'Material path',
+    label: 'Manufacturing',
     items: [
       { to: '/orders', label: 'Orders', need: 'ff_view' },
       { to: '/materials', label: 'Materials', need: 'ff_view' },
