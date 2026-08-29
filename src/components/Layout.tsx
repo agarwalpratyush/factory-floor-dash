@@ -4,21 +4,37 @@ import { usePlant } from '../lib/plant'
 import { useAuth, type Perm } from '../lib/auth'
 import { ACCOUNTS_URL } from '../lib/brand'
 
+type NavItem = { to: string; label: string; end?: boolean; need: Perm }
+
 /**
  * `need` is the permission that makes a page worth showing.
  * Production is one tab everywhere: the log reads the same at both companies, and
  * only the entry form changes with the company's process.
+ *
+ * The middle group is the path material takes, in the order it takes it. It is set
+ * apart because those five tabs are one story - a promise, what arrives, what is
+ * made of it, what is left, what leaves - while the tabs above and below answer
+ * questions of their own.
  */
-const NAV: { to: string; label: string; end?: boolean; need: Perm }[] = [
-  { to: '/', label: 'Dashboard', end: true, need: 'ff_view' },
-  { to: '/orders', label: 'Orders', need: 'ff_view' },
-  { to: '/materials', label: 'Materials', need: 'ff_view' },
-  { to: '/production', label: 'Production', need: 'ff_view' },
-  { to: '/stock', label: 'Stock', need: 'ff_view' },
-  { to: '/dispatch', label: 'Dispatch', need: 'ff_manage' },
-  { to: '/attendance', label: 'Attendance', need: 'ff_view' },
-  // Money end to end, so it is not offered to a login that cannot see money.
-  { to: '/accounts', label: 'Accounts', need: 'ff_money' },
+const NAV: { label?: string; items: NavItem[] }[] = [
+  { items: [{ to: '/', label: 'Dashboard', end: true, need: 'ff_view' }] },
+  {
+    label: 'Material path',
+    items: [
+      { to: '/orders', label: 'Orders', need: 'ff_view' },
+      { to: '/materials', label: 'Materials', need: 'ff_view' },
+      { to: '/production', label: 'Production', need: 'ff_view' },
+      { to: '/stock', label: 'Stock', need: 'ff_view' },
+      { to: '/dispatch', label: 'Dispatch', need: 'ff_manage' },
+    ],
+  },
+  {
+    items: [
+      { to: '/attendance', label: 'Attendance', need: 'ff_view' },
+      // Money end to end, so it is not offered to a login that cannot see money.
+      { to: '/accounts', label: 'Accounts', need: 'ff_money' },
+    ],
+  },
 ]
 
 function PlantSwitcher() {
@@ -222,7 +238,10 @@ export default function Layout() {
   const [tick, setTick] = useState(0)
   const [spin, setSpin] = useState(false)
 
-  const nav = NAV.filter((n) => can(n.need))
+  // A group whose every tab is out of reach should not leave a heading behind.
+  const nav = NAV
+    .map((g) => ({ ...g, items: g.items.filter((n) => can(n.need)) }))
+    .filter((g) => g.items.length > 0)
 
   const link = ({ isActive }: { isActive: boolean }) =>
     'block rounded-lg px-3 py-2 text-sm font-medium transition ' +
@@ -274,12 +293,23 @@ export default function Layout() {
         <aside className={(open ? 'block ' : 'hidden ') + 'bg-slate-900 px-3 pb-4 lg:block lg:w-60 lg:shrink-0 lg:py-5'}>
           <PlantSwitcher />
           <hr className="my-4 border-slate-700" />
-          <nav className="space-y-1" onClick={() => setOpen(false)}>
-            {nav.map((n) => (
-              <NavLink key={n.to} to={n.to} end={n.end} className={link}>
-                {n.label}
-              </NavLink>
-            ))}
+          <nav className="space-y-2" onClick={() => setOpen(false)}>
+            {nav.map((g, i) => {
+              const links = g.items.map((n) => (
+                <NavLink key={n.to} to={n.to} end={n.end} className={link}>
+                  {n.label}
+                </NavLink>
+              ))
+              if (!g.label) return <div key={i} className="space-y-1">{links}</div>
+              return (
+                <div key={i} className="rounded-lg bg-slate-800 p-1 ring-1 ring-slate-700">
+                  <p className="px-3 pt-1 pb-1.5 text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+                    {g.label}
+                  </p>
+                  <div className="space-y-1">{links}</div>
+                </div>
+              )
+            })}
           </nav>
         </aside>
 
