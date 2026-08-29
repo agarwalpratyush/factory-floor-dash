@@ -7,7 +7,7 @@ import {
   Badge, Button, Card, Empty, ErrorBox, Field, inputCls,
   NotHere, PlantTag, Spinner, Stat,
 } from '../components/ui'
-import { fmtNum, today } from '../lib/format'
+import { fmtDate, fmtNum, today } from '../lib/format'
 import type { AccountBalance, AccountTxn } from '../lib/types'
 
 /**
@@ -176,7 +176,7 @@ function AccountCard({
         <Stat
           label="Entries"
           value={Number(account.entries)}
-          sub={account.last_entry ? 'last on ' + account.last_entry : 'nothing recorded yet'}
+          sub={account.last_entry ? 'last on ' + fmtDate(account.last_entry) : 'nothing recorded yet'}
         />
       </div>
 
@@ -204,7 +204,7 @@ function AccountCard({
               <tbody>
                 {txns.map((t) => (
                   <tr key={t.id} className="border-b border-slate-100 last:border-0">
-                    <td className="py-2 pr-3 whitespace-nowrap tabular-nums">{t.txn_date}</td>
+                    <td className="py-2 pr-3 whitespace-nowrap tabular-nums">{fmtDate(t.txn_date)}</td>
                     <td className="py-2 pr-3">{t.description}</td>
                     <td className="py-2 pr-3 text-slate-500">{t.paid_to ?? '—'}</td>
                     <td className="py-2 pr-3 text-slate-500">{t.category ?? '—'}</td>

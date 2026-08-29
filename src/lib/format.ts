@@ -26,6 +26,34 @@ export const fmtDate = (d: string | null | undefined) => {
 }
 
 /**
+ * A date with its weekday, for a page that is about one particular day.
+ * Sunday reading as Sunday is the point.
+ */
+export const fmtDateLong = (d: string | null | undefined) => {
+  if (!d) return '—'
+  const dt = new Date(d)
+  if (Number.isNaN(dt.getTime())) return '—'
+  return dt.toLocaleDateString('en-IN', {
+    weekday: 'long', day: '2-digit', month: 'short', year: '2-digit',
+  })
+}
+
+/**
+ * Always a 12 hour clock. The floor says half past eight, never twenty thirty,
+ * and a night shift written 20:00 is read wrong more often than it is read.
+ * Accepts the HH:MM:SS Postgres returns for a `time` column.
+ */
+export const fmtTime = (t: string | null | undefined) => {
+  if (!t) return '—'
+  const h = Number(t.slice(0, 2))
+  const m = t.slice(3, 5)
+  if (Number.isNaN(h)) return '—'
+  const suffix = h < 12 ? 'am' : 'pm'
+  const hour = h % 12 === 0 ? 12 : h % 12
+  return hour + ':' + m + ' ' + suffix
+}
+
+/**
  * Local calendar date, not UTC. toISOString() would roll IST back a day for
  * anything entered after 5:30 AM local, putting a night shift on the wrong date.
  */

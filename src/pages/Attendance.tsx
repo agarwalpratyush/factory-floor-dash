@@ -7,7 +7,7 @@ import {
   Badge, Button, Card, Empty, ErrorBox, Field, inputCls,
   NeedPlant, PlantTag, Spinner, Stat,
 } from '../components/ui'
-import { daysAgo, fmtNum, today } from '../lib/format'
+import { daysAgo, fmtDateLong, fmtNum, fmtTime, today } from '../lib/format'
 import {
   ALL_DEPTS, ATTENDANCE_LABEL, DEPTS_BY_PLANT, DEPT_GROUPING_MIN, DESIGNATIONS, SHIFTS,
 } from '../lib/types'
@@ -752,7 +752,7 @@ export default function Attendance() {
               const over = span - STANDARD_DAY_HOURS
               return (
                 <span className="tabular-nums" title="Time between clocking in and out">
-                  {fmtNum(span, 1)}h on the clock
+                  {fmtTime(cur.in_time)} → {fmtTime(cur.out_time)} · {fmtNum(span, 1)}h
                   {over > 0.01 && w.ot_eligible && (
                     <span className="text-amber-700"> · {fmtNum(over, 1)}h over</span>
                   )}
@@ -843,8 +843,11 @@ export default function Attendance() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Attendance</h1>
+          {/* The one place the day is spelled out. The picker beside it can only
+              show numbers, and the cards below no longer repeat it. */}
           <p className="text-sm text-slate-500">
-            Staff on the rolls are marked individually. Daily-wage labour is counted, not named.
+            {fmtDateLong(date)}
+            {date === today() && <span className="text-slate-400"> · today</span>}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -895,7 +898,7 @@ export default function Attendance() {
       </div>
 
       <Card
-        title={'Staff on the rolls · ' + date}
+        title="Staff on the rolls"
         action={
           <Button variant="ghost" onClick={markAllPresent} disabled={marked === workers.length}>
             Mark rest present
@@ -940,7 +943,7 @@ export default function Attendance() {
 
       {/* Everything paid by the day, in one place: the hands we know by name and
           mark individually, then the lots we only count. */}
-      <Card title={'Daily-wage labour · ' + date}>
+      <Card title="Daily-wage labour">
         {namedLabour.length > 0 && (
           <div className="mb-5">
             <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">

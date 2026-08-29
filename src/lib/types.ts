@@ -371,7 +371,7 @@ export const ALL_DEPTS = [
  *  the old eight hour labels still mean what they say. 'C' is gone; it was never
  *  used. 'G' is for group staff, who are not on a shift at all. */
 export const SHIFTS = [
-  { value: 'A', label: 'Day (08:00–20:00)' },
-  { value: 'B', label: 'Night (20:00–08:00)' },
+  { value: 'A', label: 'Day (8 am – 8 pm)' },
+  { value: 'B', label: 'Night (8 pm – 8 am)' },
   { value: 'G', label: 'General' },
 ]

@@ -170,6 +170,21 @@ Which rows are open is held in the page component, not in `WorkerRow` — that i
 declared inside `Attendance` and so remounts on every render, which is also why the
 overtime input is uncontrolled.
 
+**One date per page, and always with the month in words.** A page about a single
+day carried it three times — in the picker and again in each card heading — all as
+`2026-08-30`. It is now said once, under the page title, with its weekday, because
+whether a day is a Sunday is exactly what an attendance page is asked. Everywhere
+else a date is rendered through `fmtDate`, never printed raw: an ISO date with a
+numeric month gets misread, and the browser's own date input can only show numbers,
+which is the other reason the spelled-out one is there.
+
+**Clock times are always twelve hour.** The floor says half past eight, never twenty
+thirty, and a night shift written `20:00` is read wrong more often than it is read.
+`fmtTime` in `src/lib/format.ts` is the only way a time reaches the screen. Note
+that `<input type="time">` renders to the viewer's own locale and cannot be forced,
+which is why the clocked span is echoed back in words beside it — `8:00 pm → 8:30 am`
+— rather than trusting the widget to say it.
+
 **An unmarked day is a missing row, not a third status.** Pressing the lit button
 again takes the mark off, and that deletes the row — which is why deleting from
 `ff_attendance` follows the same rule as editing (`ff_entry`, own row, a date you
