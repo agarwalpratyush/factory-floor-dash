@@ -419,6 +419,9 @@ export default function Attendance() {
   const [openRow, setOpenRow] = useState<Record<number, boolean>>({})
   // Whose profile is open for editing. One at a time - it is a whole form.
   const [editId, setEditId] = useState<number | null>(null)
+  // Whose day is waiting on a second press before it is cleared, because clearing
+  // it would take a remark or hours down with it.
+  const [confirmClear, setConfirmClear] = useState<number | null>(null)
 
   const day = useQuery(() => loadDay(scope, date), 'att-' + scopeKey(scope) + '-' + date)
   const month = useQuery(() => loadMonth(daysAgo(29)), 'att-month')
@@ -449,10 +452,51 @@ export default function Attendance() {
     return siteFor[worker.id] ?? byWorker.get(worker.id)?.at_plant_id ?? null
   }
 
-  async function mark(worker: Worker, status: AttendanceStatus) {
+  /** Anything on the day that pressing the same button again would throw away.
+   *  at_plant_id counts only for group staff: a trigger stamps it on everyone
+   *  else, so treating it as detail would make every unmark ask. */
+  function hasDetail(a: Att | undefined, w: Worker) {
+    if (!a) return false
+    return Number(a.ot_hours) > 0
+      || !!a.remarks
+      || !!a.in_time
+      || !!a.out_time
+      || (w.plant_id === null && a.at_plant_id !== null)
+  }
+
+  /** Takes the mark off. An unanswered day is absent from the table rather than a
+   *  third status, so this deletes the row. */
+  async function unmark(worker: Worker) {
     setSaving(worker.id)
     setErr(null)
+    const { error } = await supabase
+      .from('ff_attendance')
+      .delete()
+      .eq('work_date', date)
+      .eq('worker_id', worker.id)
+    setSaving(null)
+    setConfirmClear(null)
+    if (error) setErr(error.message + ' - only whoever marked the day can unmark it.')
+    else { day.refresh(); month.refresh() }
+  }
+
+  async function mark(worker: Worker, status: AttendanceStatus) {
     const existing = byWorker.get(worker.id)
+
+    // Pressing the button that is already lit takes the mark off again. If the day
+    // carries anything but the mark itself, ask once before losing it.
+    if (existing?.status === status) {
+      if (hasDetail(existing, worker) && confirmClear !== worker.id) {
+        setConfirmClear(worker.id)
+        return
+      }
+      await unmark(worker)
+      return
+    }
+    setConfirmClear(null)
+
+    setSaving(worker.id)
+    setErr(null)
     const { error } = await supabase.from('ff_attendance').upsert(
       {
         work_date: date,
@@ -587,7 +631,8 @@ export default function Attendance() {
                 key={s}
                 onClick={() => mark(w, s)}
                 disabled={saving === w.id}
-                title={ATTENDANCE_LABEL[s]}
+                aria-pressed={active}
+                title={active ? ATTENDANCE_LABEL[s] + ' - press again to unmark' : ATTENDANCE_LABEL[s]}
                 className={
                   'h-10 w-10 rounded-lg text-sm font-semibold ring-1 transition disabled:opacity-50 ' +
                   (active ? STATUS_BTN[s] : 'bg-white text-slate-500 ring-slate-300 hover:bg-slate-100')
@@ -617,6 +662,24 @@ export default function Attendance() {
           >
             Edit
           </button>
+        )}
+
+        {confirmClear === w.id && (
+          <span className="flex items-center gap-2 text-xs text-amber-800">
+            Clear the day and what is on it?
+            <button
+              onClick={() => unmark(w)}
+              className="rounded-md bg-amber-50 px-2 py-1 font-medium text-amber-800 ring-1 ring-amber-300 transition hover:bg-amber-100"
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => setConfirmClear(null)}
+              className="rounded-md px-2 py-1 text-slate-500 ring-1 ring-slate-300 transition hover:bg-slate-100"
+            >
+              Keep
+            </button>
+          </span>
         )}
 
         {cur && (() => {

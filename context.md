@@ -170,6 +170,20 @@ Which rows are open is held in the page component, not in `WorkerRow` — that i
 declared inside `Attendance` and so remounts on every render, which is also why the
 overtime input is uncontrolled.
 
+**An unmarked day is a missing row, not a third status.** Pressing the lit button
+again takes the mark off, and that deletes the row — which is why deleting from
+`ff_attendance` follows the same rule as editing (`ff_entry`, own row, a date you
+may write to) rather than being administrator-only as it was. Do not add a `none`
+status to the enum to represent this: every count on the page is written as
+&ldquo;marked&rdquo; versus &ldquo;not marked&rdquo;, and a third value would have to
+be excluded everywhere by hand.
+
+Where the day carries more than the mark — overtime, a remark, clock times, or a
+site chosen for group staff — the second press asks first, because those are typed
+by hand and would go with it. `at_plant_id` deliberately counts only for group
+staff: a trigger stamps it on everyone else, so treating it as detail would make
+every unmark ask, and a prompt that always appears is one nobody reads.
+
 **The Attendance page splits by how someone is paid, not by whether we know their
 name.** Anyone whose designation is `Labour` is listed under Daily-wage labour
 rather than on the roll, and moves there the moment the designation is changed —
