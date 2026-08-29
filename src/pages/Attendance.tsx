@@ -364,6 +364,7 @@ export default function Attendance() {
             {stat && ' · ' + fmtNum(stat.present, 1) + 'd present /30'}
           </div>
           {w.notes && <div className="text-xs text-amber-700">{w.notes}</div>}
+          {cur?.remarks && <div className="text-xs text-slate-600">“{cur.remarks}”</div>}
         </div>
 
         <div className="flex flex-wrap gap-1.5">
@@ -395,8 +396,8 @@ export default function Attendance() {
         )}
         {!cur && <Badge tone="amber">not marked</Badge>}
 
-        {cur?.status === 'present' && (() => {
-          const needsSite = isGroup && cur.at_plant_id === null
+        {cur && (() => {
+          const needsSite = isGroup && cur.status === 'present' && cur.at_plant_id === null
           return (
             <button
               onClick={() => setOpenRow({ ...openRow, [w.id]: !openRow[w.id] })}
@@ -414,8 +415,9 @@ export default function Attendance() {
           )
         })()}
 
-        {cur?.status === 'present' && openRow[w.id] && (
+        {cur && openRow[w.id] && (
           <div className="flex w-full flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-200 pt-2 text-xs text-slate-500">
+            {cur.status === 'present' && <>
             <label className="flex items-center gap-1.5">
               Shift
               <select
@@ -472,6 +474,23 @@ export default function Attendance() {
                 </select>
               </label>
             )}
+            </>}
+
+            <label className="flex min-w-[220px] flex-1 items-center gap-1.5">
+              Remarks
+              <input
+                type="text"
+                maxLength={200}
+                defaultValue={cur.remarks ?? ''}
+                disabled={saving === w.id}
+                onBlur={(e) => {
+                  const v = e.target.value.trim()
+                  if (v !== (cur.remarks ?? '')) patch(w, { remarks: v || null })
+                }}
+                placeholder={cur.status === 'absent' ? 'why they are away' : 'anything worth noting'}
+                className="min-w-0 flex-1 rounded-md border border-slate-300 px-1.5 py-1"
+              />
+            </label>
           </div>
         )}
       </li>

@@ -163,6 +163,12 @@ Which rows are open is held in the page component, not in `WorkerRow` — that i
 declared inside `Attendance` and so remounts on every render, which is also why the
 overtime input is uncontrolled.
 
+**A remark is the reason the row reads the way it does**, so it belongs to any
+marked day, present or absent — which is why the Details toggle appears on both,
+even though shift, overtime and site are present-only. A remark that has been
+written shows on the row itself, quoted, without opening anything: nobody reads a
+note they have to go looking for. Blank saves as null, not an empty string.
+
 **General is the default shift.** Most people here are not on a rota at all, so `G`
 is what both column defaults give and what a new worker's form starts on. `A` (day)
 and `B` (night) are for someone actually working a shift.
