@@ -27,7 +27,6 @@ function PlantSwitcher() {
     return (
       <div className="rounded-lg bg-slate-800 px-3 py-2">
         <div className="text-sm font-medium text-white">{p?.short_name ?? 'Your company'}</div>
-        <div className="text-xs text-slate-400">{p?.city}</div>
       </div>
     )
   }
@@ -54,7 +53,6 @@ function PlantSwitcher() {
           }
         >
           {p.short_name}
-          <span className="block text-xs font-normal opacity-70">{p.city}</span>
         </button>
       ))}
     </div>
