@@ -270,7 +270,7 @@ function WorkerForm({
  * 400 average into a figure true of neither. A day carries as many lots as it
  * needs, and `work` is what tells them apart.
  */
-function DailyLabourCard({
+function DailyLabourRegister({
   plantId, date, lines, canEnter, onDone,
 }: {
   plantId: number
@@ -314,10 +314,10 @@ function DailyLabourCard({
   }
 
   return (
-    <Card title={'Daily-wage labour ' + '·' + ' ' + date}>
-      <p className="-mt-1 mb-3 text-xs text-slate-500">
-        Not on the rolls, so they are counted for the day rather than named. Add a lot
-        for each group on different work or a different rate.
+    <>
+      <p className="mb-3 text-xs text-slate-500">
+        Hands hired by the day, not carried on the rolls, so they are counted rather
+        than named. Add a lot for each group on different work or a different rate.
       </p>
 
       {lines.length === 0 ? (
@@ -400,7 +400,7 @@ function DailyLabourCard({
       )}
 
       {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
-    </Card>
+    </>
   )
 }
 
@@ -505,8 +505,16 @@ export default function Attendance() {
   }
 
   const workers = day.data?.workers ?? []
-  const onRolls = workers.filter((w) => w.plant_id !== null)
-  const groupStaff = workers.filter((w) => w.plant_id === null)
+  // Someone taken on as Labour is paid by the day like the counted hands, not
+  // carried as staff, so they are listed with them rather than on the roll. They
+  // keep their code and are still marked individually - the difference is how they
+  // are paid, not whether we know who they are.
+  const isLabour = (w: Worker) => w.designation === 'Labour'
+  const namedLabour = workers.filter(isLabour)
+  const staff = workers.filter((w) => !isLabour(w))
+
+  const onRolls = staff.filter((w) => w.plant_id !== null)
+  const groupStaff = staff.filter((w) => w.plant_id === null)
 
   const marked = workers.filter((w) => byWorker.has(w.id)).length
   const present = workers.filter((w) => byWorker.get(w.id)?.status === 'present').length
@@ -831,8 +839,8 @@ export default function Attendance() {
           </Button>
         }
       >
-        {day.loading ? <Spinner /> : day.error ? <ErrorBox error={day.error} onRetry={day.refresh} /> : workers.length === 0 ? (
-          <Empty>No active workers.</Empty>
+        {day.loading ? <Spinner /> : day.error ? <ErrorBox error={day.error} onRetry={day.refresh} /> : staff.length === 0 ? (
+          <Empty>Nobody on the rolls here. Anyone taken on as Labour is listed below.</Empty>
         ) : (
           <div className="space-y-5">
             {byDept.map(([key, g]) => (
@@ -867,22 +875,43 @@ export default function Attendance() {
         )}
       </Card>
 
-      {/* Casual labour is its own register, not a footnote to the roll: nobody
-          here is named, nothing is marked P or A, and the count changes daily. */}
-      {plant ? (
-        <DailyLabourCard
-          key={plant.id + date}
-          plantId={plant.id}
-          date={date}
-          lines={labour.filter((l) => l.plant_id === plant.id)}
-          canEnter={can('ff_entry')}
-          onDone={day.refresh}
-        />
-      ) : (
-        <Card title={'Daily-wage labour · ' + date}>
-          <NeedPlant what="record daily labour" />
-        </Card>
-      )}
+      {/* Everything paid by the day, in one place: the hands we know by name and
+          mark individually, then the lots we only count. */}
+      <Card title={'Daily-wage labour · ' + date}>
+        {namedLabour.length > 0 && (
+          <div className="mb-5">
+            <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+              On the books
+              <span className="ml-1 font-normal text-slate-400">({namedLabour.length})</span>
+            </h3>
+            <ul className="space-y-2">
+              {namedLabour.map((w) => <WorkerRow key={w.id} w={w} />)}
+            </ul>
+            <p className="mt-2 text-xs text-slate-500">
+              Paid by the day, but known by name, so they are marked like anyone else.
+            </p>
+          </div>
+        )}
+
+        {namedLabour.length > 0 && (
+          <h3 className="mb-2 border-t border-slate-100 pt-4 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+            Counted, not named
+          </h3>
+        )}
+
+        {plant ? (
+          <DailyLabourRegister
+            key={plant.id + date}
+            plantId={plant.id}
+            date={date}
+            lines={labour.filter((l) => l.plant_id === plant.id)}
+            canEnter={can('ff_entry')}
+            onDone={day.refresh}
+          />
+        ) : (
+          <NeedPlant what="record casual labour" />
+        )}
+      </Card>
     </div>
   )
 }

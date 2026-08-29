@@ -170,6 +170,14 @@ Which rows are open is held in the page component, not in `WorkerRow` — that i
 declared inside `Attendance` and so remounts on every render, which is also why the
 overtime input is uncontrolled.
 
+**The Attendance page splits by how someone is paid, not by whether we know their
+name.** Anyone whose designation is `Labour` is listed under Daily-wage labour
+rather than on the roll, and moves there the moment the designation is changed —
+there is no separate flag to keep in step. They keep their code and are still marked
+individually; being paid by the day is not the same as being anonymous. That is why
+the labour card has two parts: *On the books* (named, marked P or A) and *Counted,
+not named* (the lots).
+
 **Casual labour is its own register, not a footnote to the roll.** Nobody in it is
 named, nothing is marked present or absent, and the count changes every day, so it
 sits in a separate card under the roll rather than among people who have codes.
