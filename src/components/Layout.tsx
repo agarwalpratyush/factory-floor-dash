@@ -41,7 +41,6 @@ function PlantSwitcher() {
         }
       >
         Combined View
-        <span className="block text-xs font-normal opacity-70">both companies, read only</span>
       </button>
       {plants.map((p) => (
         <button
