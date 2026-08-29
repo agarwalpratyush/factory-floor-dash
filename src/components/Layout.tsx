@@ -95,7 +95,6 @@ export default function Layout() {
       <aside className={(open ? 'block ' : 'hidden ') + 'bg-slate-900 px-3 pb-4 lg:flex lg:w-60 lg:shrink-0 lg:flex-col lg:px-3 lg:py-5'}>
         <div className="mb-4 hidden px-2 lg:block">
           <div className="text-base font-semibold text-white">Factory Floor</div>
-          <div className="text-xs text-slate-400">two companies, one book</div>
         </div>
 
         <PlantSwitcher />
