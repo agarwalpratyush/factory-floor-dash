@@ -36,7 +36,7 @@ function PlantSwitcher() {
       key={p.id}
       onClick={() => setScope(p.id)}
       className={
-        'w-full rounded-lg px-3 py-2 text-left text-sm leading-snug font-medium transition ' +
+        'w-full rounded-lg px-3 py-2 text-center text-sm leading-snug font-medium transition ' +
         (scope === p.id ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white')
       }
     >
