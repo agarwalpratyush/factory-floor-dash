@@ -42,14 +42,24 @@ company's *finished product* and the fabrication company's *raw material*. So
 plant) pair, not on the material. `ff_materials.category` is only the article's
 general nature.
 
-**An article belongs to one page, decided by that role.** Raw Material carries
-`raw` and `wip` — what is bought in and consumed; Finished Stock carries
-`finished` — what is made and sold. Neither shows the other's articles, so nobody
-has to ask which balance is the real one. The same article can appear on Raw
-Material at one company and on Finished Stock at the other, which is the point.
-Anything keyed on an article must therefore carry the plant too: a bare
-`material_id` collides across companies, which is what made the material picker
-render duplicate React keys in the combined view.
+**What an article IS and whether it may be SOLD are separate facts.** A DT mesh
+roll is made to go into a gabion box *and* sold as it stands; one `role` per
+(material, plant) could not say both, and the effect was that no mesh roll could be
+put on a customer dispatch at all. So `ff_material_plants.sellable` is its own
+column. `role` still decides which page owns the article and whether it gets a
+reorder level; `sellable` decides whether it can leave to a customer, appear on
+Finished Stock, and be promised on an order line. A trigger forces it true for
+`finished`, because that is true by definition; `wip` opts in.
+
+An article that is both shows on **two** pages — Raw Material because it is consumed
+there, Finished Stock because it can be sold — and both say so in as many words.
+That is one balance doing two jobs, not two piles: there is deliberately no
+reservation, because splitting the pool would need somebody to move rolls between
+buckets and nobody will.
+
+Anything keyed on an article must carry the plant too: a bare `material_id` collides
+across companies, which is what made the material picker render duplicate React keys
+in the combined view.
 
 **Buying is the only movement typed by hand.** Production posts what it consumed,
 Dispatch posts what left, and a transfer posts both sides — so a purchase is the

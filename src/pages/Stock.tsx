@@ -7,7 +7,6 @@ import {
   Button, Card, ErrorBox, NeedPlant, Spinner, Stat,
 } from '../components/ui'
 import { AddMaterialForm, ROLE_HINT, RoleTable } from '../components/stock'
-import { STOCK_ROLE_LABEL } from '../lib/types'
 import type { Material, StockLevel } from '../lib/types'
 
 async function loadStock(scope: PlantScope) {
@@ -31,10 +30,12 @@ export default function Stock() {
 
   const all = useMemo(() => (data?.stock ?? []).filter((s) => s.active), [data])
 
-  // Stock is finished goods only. Raw material and work in progress live on the
-  // Raw Material tab, where they are bought and consumed - an article belongs to
-  // one page, so nobody has to ask which balance is the real one.
-  const finished = useMemo(() => all.filter((s) => s.role === 'finished'), [all])
+  // Everything that can go out to a customer, which is every finished article plus
+  // any half-made one that is also sold as it stands. Those also appear on Raw
+  // Material, because they are consumed there too - one balance, shown where each
+  // page needs it, and labelled so nobody adds the two together.
+  const finished = useMemo(() => all.filter((s) => s.sellable), [all])
+  const alsoConsumed = finished.filter((s) => s.role !== 'finished')
 
   const negative = finished.filter((s) => Number(s.balance) < 0)
   const held = finished.filter((s) => Number(s.balance) > 0)
@@ -55,9 +56,9 @@ export default function Stock() {
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Finished Stock</h1>
           <p className="text-sm text-slate-500">
-            What is made here and ready to leave. Raw material and work in progress are
-            on <strong>Raw Material</strong> — an article is bought and consumed there,
-            and sold from here.
+            What can go out to a customer. Raw material is on <strong>Raw Material</strong>;
+            anything half-made that is also sold appears on both, because it is one
+            balance doing two jobs.
           </p>
         </div>
         {plant && can('ff_manage') && (
@@ -98,8 +99,14 @@ export default function Stock() {
       </div>
 
       {loading ? <Spinner /> : error ? <ErrorBox error={error} onRetry={refresh} /> : (
-        <Card title={STOCK_ROLE_LABEL.finished}>
-          <p className="-mt-1 mb-3 text-xs text-slate-500">{ROLE_HINT.finished}</p>
+        <Card title="Sellable articles">
+          <p className="-mt-1 mb-3 text-xs text-slate-500">
+            {ROLE_HINT.finished}
+            {alsoConsumed.length > 0 && (
+              <> {alsoConsumed.map((s) => s.code).join(', ')} {alsoConsumed.length === 1 ? 'is' : 'are'}{' '}
+              also consumed here, so the same balance shows on Raw Material — it is not extra stock.</>
+            )}
+          </p>
           <RoleTable
             role="finished"
             rows={finished}

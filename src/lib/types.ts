@@ -64,6 +64,9 @@ export interface StockLevel {
   name: string
   category: string
   role: StockRole
+  /** May go out to a customer. Always true for a finished article; a wip one opts
+   *  in, which is how a mesh roll can be both consumed here and sold as it stands. */
+  sellable: boolean
   unit: string
   spec: Record<string, unknown>
   reorder_level: number
@@ -219,6 +222,8 @@ export interface OrderItem {
   unit: string
   qty_produced: number
   rate: number | null
+  /** The article promised, when the line names one. Null on a free-text line. */
+  material_id: number | null
 }
 
 export interface DispatchItem {

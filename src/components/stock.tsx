@@ -33,6 +33,9 @@ export function AddMaterialForm({
 }) {
   const [mode, setMode] = useState<'existing' | 'new'>('existing')
   const [role, setRole] = useState<StockRole>(allowedRoles[0])
+  // A finished article is sellable by definition; anything else opts in. The
+  // database enforces the first half, so this only has to offer the second.
+  const [sellable, setSellable] = useState(false)
   const [pick, setPick] = useState({ material_id: '', opening_stock: '', reorder_level: '' })
   const [f, setF] = useState({
     code: '', name: '', category: 'raw', unit: 'kg', opening_stock: '', reorder_level: '',
@@ -71,6 +74,7 @@ export function AddMaterialForm({
       material_id: materialId,
       plant_id: plantId,
       role,
+      sellable: role === 'finished' ? true : sellable,
       opening_stock: src.opening_stock ? Number(src.opening_stock) : 0,
       // Only raw materials get reordered; the rest are produced to demand.
       reorder_level: role === 'raw' && src.reorder_level ? Number(src.reorder_level) : 0,
@@ -149,6 +153,22 @@ export function AddMaterialForm({
       </div>
 
       <p className="text-xs text-slate-500">{ROLE_HINT[role]}</p>
+
+      <label className="flex items-center gap-2 text-sm text-slate-700">
+        <input
+          type="checkbox"
+          checked={role === 'finished' ? true : sellable}
+          disabled={role === 'finished'}
+          onChange={(e) => setSellable(e.target.checked)}
+          className="h-4 w-4 rounded"
+        />
+        Can be sold to a customer
+        <span className="text-xs text-slate-500">
+          {role === 'finished'
+            ? '\u2014 always, for a finished article'
+            : '\u2014 tick for something half-made that is also sold as it stands, like a mesh roll'}
+        </span>
+      </label>
       {err && <p className="text-sm text-red-600">{err}</p>}
       <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Add to this company'}</Button>
     </form>

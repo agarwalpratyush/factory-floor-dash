@@ -37,8 +37,9 @@ async function loadPage(scope: PlantScope, from: string) {
   let orderQ = supabase.from('ff_orders').select('id,order_no,customer,site').neq('stage', 'delivered').order('order_no')
   if (plant !== null) orderQ = orderQ.eq('plant_id', plant)
 
-  // Anything this company holds can go to our other company; only finished goods
-  // go to a customer.
+  // Anything this company holds can go to our other company; only what is marked
+  // sellable goes to a customer - which is every finished article, plus anything
+  // half-made that is also sold as it stands.
   let stockQ = supabase.from('ff_stock_levels').select('*').eq('active', true).order('code')
   if (plant !== null) stockQ = stockQ.eq('plant_id', plant)
 
@@ -84,7 +85,7 @@ function OutwardForm({
 
   // A customer only ever receives finished goods; our other company can take anything.
   const sendable = kind === 'customer'
-    ? stock.filter((s) => s.role === 'finished')
+    ? stock.filter((s) => s.sellable)
     : stock.filter((s) => Number(s.balance) > 0)
 
   function pickOrder(id: string) {
@@ -227,7 +228,7 @@ function OutwardForm({
               <div key={i}>
                 <div className="flex flex-wrap gap-2">
                   <select value={row.material_id} onChange={(e) => setItem(i, { material_id: e.target.value })} className={inputCls + ' flex-1 sm:max-w-sm'}>
-                    <option value="">{kind === 'customer' ? 'Select finished item…' : 'Select material…'}</option>
+                    <option value="">{kind === 'customer' ? 'Select an article…' : 'Select material…'}</option>
                     {sendable.map((s) => (
                       <option key={s.material_id} value={s.material_id}>
                         {s.code} — {s.name} ({fmtQty(s.balance)} {s.unit} on hand)

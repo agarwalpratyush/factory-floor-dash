@@ -6,7 +6,7 @@ import { usePlant, scopeKey, type PlantScope } from '../lib/plant'
 import { useAuth } from '../lib/auth'
 import { fmtDate, fmtMoney, fmtQty, today } from '../lib/format'
 import { ORDER_STAGES, STAGE_LABEL } from '../lib/types'
-import type { OrderItem, OrderProgress, OrderStage } from '../lib/types'
+import type { OrderItem, OrderProgress, OrderStage, StockLevel } from '../lib/types'
 
 interface StageLogRow {
   id: number
@@ -24,18 +24,98 @@ async function loadOrders(scope: PlantScope) {
   return (data ?? []) as OrderProgress[]
 }
 
-async function loadDetail(orderId: number) {
-  const [items, log] = await Promise.all([
+async function loadDetail(orderId: number, plantId: number) {
+  const [items, log, stock] = await Promise.all([
     supabase.from('ff_order_items').select('*').eq('order_id', orderId).order('id'),
     supabase.from('ff_order_stage_log').select('*').eq('order_id', orderId).order('changed_at', { ascending: false }),
+    // What this company can promise: every finished article, plus anything
+    // half-made that is also sold as it stands.
+    supabase.from('ff_stock_levels').select('*')
+      .eq('plant_id', plantId).eq('active', true).eq('sellable', true).order('code'),
   ])
-  if (items.error) throw new Error(items.error.message)
-  if (log.error) throw new Error(log.error.message)
-  return { items: (items.data ?? []) as OrderItem[], log: (log.data ?? []) as StageLogRow[] }
+  const failed = [items, log, stock].find((r) => r.error)
+  if (failed?.error) throw new Error(failed.error.message)
+  return {
+    items: (items.data ?? []) as OrderItem[],
+    log: (log.data ?? []) as StageLogRow[],
+    sellable: (stock.data ?? []) as StockLevel[],
+  }
+}
+
+/** A line names an article where it can, and is free text where it cannot - a
+ *  customer PO does not always match our article list. */
+function AddItemForm({ orderId, sellable, onDone }: {
+  orderId: number
+  sellable: StockLevel[]
+  onDone: () => void
+}) {
+  const [f, setF] = useState({ material_id: '', description: '', qty: '', unit: 'nos', rate: '' })
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  function pick(id: string) {
+    const m = sellable.find((x) => String(x.material_id) === id)
+    // Choosing an article fills the line in; the description stays editable
+    // because a customer often words it their own way.
+    setF(m
+      ? { ...f, material_id: id, description: m.name, unit: m.unit }
+      : { ...f, material_id: '' })
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setErr(null)
+    const { error } = await supabase.from('ff_order_items').insert({
+      order_id: orderId,
+      material_id: f.material_id ? Number(f.material_id) : null,
+      description: f.description.trim(),
+      qty: Number(f.qty),
+      unit: f.unit,
+      rate: f.rate ? Number(f.rate) : null,
+    })
+    setBusy(false)
+    if (error) setErr(error.message)
+    else { setF({ material_id: '', description: '', qty: '', unit: 'nos', rate: '' }); onDone() }
+  }
+
+  return (
+    <form onSubmit={submit} className="mt-3 grid gap-2 border-t border-slate-200 pt-3 sm:grid-cols-2">
+      <Field label="Article">
+        <select value={f.material_id} onChange={(e) => pick(e.target.value)} className={inputCls}>
+          <option value="">Not on our list — describe it</option>
+          {sellable.map((m) => (
+            <option key={m.material_id} value={m.material_id}>
+              {m.code} — {m.name} ({fmtQty(m.balance)} {m.unit} on hand)
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Description *">
+        <input required value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} className={inputCls} />
+      </Field>
+      <Field label="Quantity *">
+        <input required type="number" step="0.001" min="0.001" value={f.qty} onChange={(e) => setF({ ...f, qty: e.target.value })} className={inputCls} />
+      </Field>
+      <Field label="Unit">
+        <input value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} className={inputCls} />
+      </Field>
+      <Field label={'Rate (' + '₹' + ')'}>
+        <input type="number" step="0.01" value={f.rate} onChange={(e) => setF({ ...f, rate: e.target.value })} className={inputCls} />
+      </Field>
+      {err && <p className="text-sm text-red-600 sm:col-span-2">{err}</p>}
+      <div className="sm:col-span-2">
+        <Button type="submit" disabled={busy || !f.description || !f.qty}>
+          {busy ? 'Saving' + '…' : 'Add line item'}
+        </Button>
+      </div>
+    </form>
+  )
 }
 
 function OrderDetail({ order, onChanged, canWrite }: { order: OrderProgress; onChanged: () => void; canWrite: boolean }) {
-  const { data, loading, error, refresh } = useQuery(() => loadDetail(order.id), 'detail-' + order.id)
+  const { data, loading, error, refresh } = useQuery(() => loadDetail(order.id, order.plant_id), 'detail-' + order.id)
+  const [adding, setAdding] = useState(false)
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
 
@@ -123,6 +203,16 @@ function OrderDetail({ order, onChanged, canWrite }: { order: OrderProgress; onC
                 </tbody>
               </table>
             </div>
+
+            {canWrite && (
+              adding
+                ? <AddItemForm orderId={order.id} sellable={data.sellable} onDone={() => { setAdding(false); refresh(); onChanged() }} />
+                : (
+                  <Button variant="ghost" className="mt-3" onClick={() => setAdding(true)}>
+                    + Line item
+                  </Button>
+                )
+            )}
             <p className="mt-2 text-xs text-slate-500">
               {canWrite
                 ? 'Edit a produced figure and click away to save.'

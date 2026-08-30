@@ -296,6 +296,13 @@ export default function Materials() {
                 {role === 'raw' && (
                   <p className="mt-3 text-xs text-slate-500">Click a reorder level to change it for that company.</p>
                 )}
+                {inRole.some((x) => x.sellable) && (
+                  <p className="mt-3 text-xs text-slate-500">
+                    {inRole.filter((x) => x.sellable).map((x) => x.code).join(', ')} can also be
+                    sold as {inRole.filter((x) => x.sellable).length === 1 ? 'it is' : 'they are'}, so
+                    the same balance appears on Finished Stock. It is one pool, not two.
+                  </p>
+                )}
               </Card>
             )
           })}
