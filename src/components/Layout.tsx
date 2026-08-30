@@ -44,38 +44,41 @@ function PlantSwitcher() {
   if (pinned !== null) {
     const p = plants.find((x) => x.id === pinned)
     return (
-      <div className="rounded-lg bg-slate-800 px-3 py-2 text-center">
-        <div className="text-sm font-medium text-white">{p?.name ?? 'Your company'}</div>
+      <div className="rounded-lg bg-slate-800 px-3 py-2.5 text-center text-sm leading-snug font-medium text-white">
+        {p?.name ?? 'Your company'}
       </div>
     )
   }
 
-  const companyBtn = (p: (typeof plants)[number]) => (
-    <button
-      key={p.id}
-      onClick={() => setScope(p.id)}
-      className={
-        'w-full rounded-lg px-3 py-2 text-center text-sm leading-snug font-medium transition ' +
-        (scope === p.id ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white')
-      }
-    >
-      {p.name}
-    </button>
-  )
+  const companyBtn = (p: (typeof plants)[number]) => {
+    const on = scope === p.id
+    return (
+      <button
+        key={p.id}
+        onClick={() => setScope(p.id)}
+        aria-pressed={on}
+        className={
+          'w-full rounded-lg px-3 py-2.5 text-center text-sm leading-snug font-medium transition ' +
+          (on ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white')
+        }
+      >
+        {p.name}
+      </button>
+    )
+  }
 
-  // Combined sits between the companies it joins, with a rule running through it,
-  // so the grouping is visible rather than described.
+  // Combined sits between the two companies it joins. It had a rule drawn through
+  // it to say so, which only added a line to look at - the position already says it.
   const combined = (
-    <div key="combined" className="relative flex justify-center py-1">
-      <span aria-hidden className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-slate-700" />
+    <div key="combined" className="flex justify-center py-1">
       <button
         onClick={() => setScope('group')}
         aria-pressed={scope === 'group'}
         className={
-          'relative rounded-md px-2 py-0.5 text-xs font-medium tracking-wide transition ' +
+          'rounded-md px-2.5 py-1 text-[11px] font-medium tracking-wide uppercase transition ' +
           (scope === 'group'
-            ? 'bg-slate-700 text-white ring-1 ring-slate-500'
-            : 'bg-slate-900 text-slate-400 ring-1 ring-slate-700 hover:text-white')
+            ? 'bg-slate-700 text-white'
+            : 'text-slate-500 hover:bg-slate-800 hover:text-slate-300')
         }
       >
         Combined
@@ -87,7 +90,7 @@ function PlantSwitcher() {
   const mid = Math.floor(plants.length / 2)
 
   return (
-    <div className="space-y-1">
+    <div>
       {plants.slice(0, mid).map(companyBtn)}
       {combined}
       {plants.slice(mid).map(companyBtn)}
