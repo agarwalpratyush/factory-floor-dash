@@ -22,9 +22,9 @@ const NAV: { label?: string; items: NavItem[] }[] = [
     label: 'Manufacturing',
     items: [
       { to: '/orders', label: 'Orders', need: 'ff_view' },
-      { to: '/materials', label: 'Materials', need: 'ff_view' },
+      { to: '/raw-material', label: 'Raw Material', need: 'ff_view' },
       { to: '/production', label: 'Production', need: 'ff_view' },
-      { to: '/stock', label: 'Stock', need: 'ff_view' },
+      { to: '/stock', label: 'Finished Stock', need: 'ff_view' },
       { to: '/dispatch', label: 'Dispatch', need: 'ff_manage' },
     ],
   },

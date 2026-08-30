@@ -7,7 +7,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Orders from './pages/Orders'
 import Production from './pages/Production'
-import Materials from './pages/Materials'
+import RawMaterial from './pages/RawMaterial'
 import Stock from './pages/Stock'
 import Attendance from './pages/Attendance'
 import Accounts from './pages/Accounts'
@@ -48,7 +48,9 @@ function Gate() {
             <Route path="shift-log" element={<Navigate to="/production" replace />} />
             {/* Transfers folded into Dispatch; keep old links working. */}
             <Route path="transfers" element={<Navigate to="/dispatch" replace />} />
-            <Route path="materials" element={<Materials />} />
+            <Route path="raw-material" element={<RawMaterial />} />
+            {/* The tab this replaced. Anyone with it bookmarked lands in the right place. */}
+            <Route path="materials" element={<Navigate to="/raw-material" replace />} />
             <Route path="stock" element={<Stock />} />
             <Route path="attendance" element={<Attendance />} />
             <Route path="accounts" element={<Accounts />} />

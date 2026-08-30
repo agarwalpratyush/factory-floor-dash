@@ -40,8 +40,24 @@ drift out of sync with the ledger. Every balance traces to `ff_material_txns`.
 company's *finished product* and the fabrication company's *raw material*. So
 `ff_material_plants.role` (`raw` / `wip` / `finished`) sits on the (material,
 plant) pair, not on the material. `ff_materials.category` is only the article's
-general nature. Reorder levels apply to `raw` alone — the rest are produced to
-demand.
+general nature.
+
+**An article belongs to one page, decided by that role.** Raw Material carries
+`raw` and `wip` — what is bought in and consumed; Finished Stock carries
+`finished` — what is made and sold. Neither shows the other's articles, so nobody
+has to ask which balance is the real one. The same article can appear on Raw
+Material at one company and on Finished Stock at the other, which is the point.
+Anything keyed on an article must therefore carry the plant too: a bare
+`material_id` collides across companies, which is what made the material picker
+render duplicate React keys in the combined view.
+
+**Buying is the only movement typed by hand.** Production posts what it consumed,
+Dispatch posts what left, and a transfer posts both sides — so a purchase is the
+one event nothing else records. The old Materials tab also offered an *Issue OUT*,
+which overlapped with production consumption and would have double-counted;
+nothing ever used it, and it is gone. If material needs to leave the store for
+some other reason — wastage, maintenance, job work — add an explicit movement type
+for it rather than reviving a general-purpose issue.
 
 **Business facts live in data, not code.** Three things that look like they belong
 in `if` statements are rows instead, because they change:

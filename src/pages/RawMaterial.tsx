@@ -5,11 +5,22 @@ import { usePlant, scopeKey, type PlantScope } from '../lib/plant'
 import { useAuth } from '../lib/auth'
 import {
   Badge, Button, Card, Empty, ErrorBox, Field, inputCls,
-  NeedPlant, PlantTag, Spinner,
+  NeedPlant, PlantTag, Spinner, Stat,
 } from '../components/ui'
+import { AddMaterialForm, ROLE_HINT, RoleTable } from '../components/stock'
 import { daysAgo, fmtDate, fmtNum, fmtQty, today } from '../lib/format'
-import { TXN_TYPE_LABEL } from '../lib/types'
-import type { Direction, MaterialTxn, Order, StockLevel, TxnType } from '../lib/types'
+import { STOCK_ROLE_LABEL, TXN_TYPE_LABEL } from '../lib/types'
+import type { Direction, Material, MaterialTxn, Order, StockLevel, StockRole, TxnType } from '../lib/types'
+
+/**
+ * What is bought in and consumed here: raw material, and the work in progress made
+ * out of it. Purchases are the only thing entered by hand - a production run posts
+ * its own consumption, so buying is the one event nothing else records.
+ *
+ * These articles are deliberately absent from Stock, which carries finished goods.
+ * An article belongs to one page, so nobody has to ask which balance is the real one.
+ */
+const HELD_HERE: StockRole[] = ['raw', 'wip']
 
 const TXN_TONE: Record<TxnType, 'green' | 'amber' | 'blue' | 'violet' | 'slate' | 'cyan'> = {
   purchase: 'green', production_in: 'cyan', transfer_in: 'blue', return_in: 'slate',
@@ -31,17 +42,20 @@ async function loadPage(scope: PlantScope, from: string) {
   let stockQ = supabase.from('ff_stock_levels').select('*').eq('active', true).order('code')
   if (plant !== null) stockQ = stockQ.eq('plant_id', plant)
 
+  const matQ = supabase.from('ff_materials').select('*').order('code')
+
   let orderQ = supabase.from('ff_orders').select('id,order_no,customer').neq('stage', 'delivered').order('order_no')
   if (plant !== null) orderQ = orderQ.eq('plant_id', plant)
 
-  const [txns, stock, orders] = await Promise.all([txnQ, stockQ, orderQ])
+  const [txns, stock, orders, mats] = await Promise.all([txnQ, stockQ, orderQ, matQ])
 
-  const failed = [txns, stock, orders].find((r) => r.error)
+  const failed = [txns, stock, orders, mats].find((r) => r.error)
   if (failed?.error) throw new Error(failed.error.message)
 
   return {
     txns: (txns.data ?? []) as MaterialTxn[],
     stock: (stock.data ?? []) as StockLevel[],
+    materials: (mats.data ?? []) as Material[],
     orders: (orders.data ?? []) as Pick<Order, 'id' | 'order_no' | 'customer'>[],
   }
 }
@@ -54,7 +68,6 @@ function EntryForm({
   orders: Pick<Order, 'id' | 'order_no' | 'customer'>[]
   onDone: () => void
 }) {
-  const [dir, setDir] = useState<Direction>('in')
   const [f, setF] = useState({
     txn_date: today(), material_id: '', qty: '', unit_rate: '',
     party: '', ref_no: '', order_id: '', remarks: '',
@@ -64,7 +77,6 @@ function EntryForm({
   const [ok, setOk] = useState(false)
 
   const mat = stock.find((m) => String(m.material_id) === f.material_id)
-  const short = dir === 'out' && mat && f.qty ? Number(f.qty) - Number(mat.balance) : 0
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -73,10 +85,10 @@ function EntryForm({
     setOk(false)
     const { error } = await supabase.from('ff_material_txns').insert({
       txn_date: f.txn_date,
-      direction: dir,
-      // Hand entry is a market purchase or a shop-floor issue. Production and
-      // transfers post their own rows through their RPCs.
-      txn_type: dir === 'in' ? 'purchase' : 'issue',
+      direction: 'in',
+      // Buying is the only movement nothing else records. Production posts its own
+      // consumption and Dispatch its own outward, both through their RPCs.
+      txn_type: 'purchase',
       material_id: Number(f.material_id),
       plant_id: plantId,
       qty: Number(f.qty),
@@ -96,22 +108,10 @@ function EntryForm({
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <div className="inline-flex rounded-lg bg-slate-100 p-1">
-        <button
-          type="button" onClick={() => setDir('in')}
-          className={'rounded-md px-4 py-2 text-sm font-medium transition ' + (dir === 'in' ? 'bg-white text-green-700 shadow-sm' : 'text-slate-600')}
-        >
-          Purchase IN
-        </button>
-        <button
-          type="button" onClick={() => setDir('out')}
-          className={'rounded-md px-4 py-2 text-sm font-medium transition ' + (dir === 'out' ? 'bg-white text-amber-700 shadow-sm' : 'text-slate-600')}
-        >
-          Issue OUT
-        </button>
-      </div>
       <p className="text-xs text-slate-500">
-        For a production run use <strong>Production</strong>; to send stock to the other company use <strong>Dispatch</strong>. Both post their movements automatically.
+        Buying is the only thing entered here. A production run takes what it consumed
+        out by itself, and <strong>Dispatch</strong> handles anything leaving the gate —
+        entering either by hand would count it twice.
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -122,7 +122,7 @@ function EntryForm({
           <select required value={f.material_id} onChange={(e) => setF({ ...f, material_id: e.target.value })} className={inputCls}>
             <option value="">Select…</option>
             {stock.map((m) => (
-              <option key={m.material_id} value={m.material_id}>
+              <option key={m.plant_id + '-' + m.material_id} value={m.material_id}>
                 {m.code} — {m.name} ({fmtQty(m.balance)} {m.unit})
               </option>
             ))}
@@ -131,16 +131,16 @@ function EntryForm({
         <Field label={'Quantity *' + (mat ? ' (' + mat.unit + ')' : '')}>
           <input required type="number" step="0.001" min="0.001" value={f.qty} onChange={(e) => setF({ ...f, qty: e.target.value })} className={inputCls} />
         </Field>
-        <Field label={dir === 'in' ? 'Rate per unit (₹)' : 'Rate (optional)'}>
+        <Field label="Rate per unit (₹)">
           <input type="number" step="0.01" value={f.unit_rate} onChange={(e) => setF({ ...f, unit_rate: e.target.value })} className={inputCls} />
         </Field>
-        <Field label={dir === 'in' ? 'Supplier' : 'Issued to (dept / line)'}>
+        <Field label="Supplier">
           <input
             value={f.party} onChange={(e) => setF({ ...f, party: e.target.value })} className={inputCls}
-            placeholder={dir === 'in' ? 'Tata Wiron, Supreme Polymers…' : 'extrusion, mesh, assembly…'}
+            placeholder="Tata Wiron, Supreme Polymers…"
           />
         </Field>
-        <Field label={dir === 'in' ? 'Invoice / challan no' : 'Issue slip no'}>
+        <Field label="Invoice / challan no">
           <input value={f.ref_no} onChange={(e) => setF({ ...f, ref_no: e.target.value })} className={inputCls} />
         </Field>
         <Field label="Against order">
@@ -154,16 +154,11 @@ function EntryForm({
         </Field>
       </div>
 
-      {short > 0 && mat && (
-        <p className="text-xs text-amber-700">
-          Only {fmtQty(mat.balance)} {mat.unit} on hand — this issue puts stock {fmtQty(short)} {mat.unit} negative.
-        </p>
-      )}
       {err && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>}
       {ok && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Saved. Stock updated.</p>}
 
       <Button type="submit" disabled={busy || !f.material_id || !f.qty}>
-        {busy ? 'Saving…' : dir === 'in' ? 'Record receipt' : 'Record issue'}
+        {busy ? 'Saving…' : 'Record purchase'}
       </Button>
     </form>
   )
@@ -173,12 +168,15 @@ export default function Materials() {
   const { scope, plant, byId } = usePlant()
   const { can } = useAuth()
   const money = can('ff_money')
+  const manage = can('ff_manage')
   const [days, setDays] = useState(30)
   const { data, loading, error, refresh } = useQuery(
     () => loadPage(scope, daysAgo(days)),
     'materials-' + scopeKey(scope) + '-' + days,
   )
   const [typeFilter, setTypeFilter] = useState<'all' | Direction>('all')
+  const [showNew, setShowNew] = useState(false)
+  const [editing, setEditing] = useState<string | null>(null)
   const [q, setQ] = useState('')
 
   const rows = useMemo(() => {
@@ -193,30 +191,119 @@ export default function Materials() {
     return r
   }, [data, typeFilter, q])
 
-  const totalIn = rows.filter((t) => t.direction === 'in').length
-  const totalOut = rows.filter((t) => t.direction === 'out').length
+  const held = useMemo(
+    () => (data?.stock ?? []).filter((x) => HELD_HERE.includes(x.role)),
+    [data],
+  )
+
+  /** A material's role is per company, so the key has to carry the plant: coated
+   *  wire is finished at Saffron and raw at Agarwal. */
+  const heldKeys = useMemo(
+    () => new Set(held.map((x) => x.plant_id + '-' + x.material_id)),
+    [held],
+  )
+
+  const ledger = rows.filter((t) => heldKeys.has(t.plant_id + '-' + t.material_id))
+  const totalIn = ledger.filter((t) => t.direction === 'in').length
+  const totalOut = ledger.filter((t) => t.direction === 'out').length
+
+  const low = held.filter((x) => x.role === 'raw' && Number(x.balance) < Number(x.reorder_level))
+  const negative = held.filter((x) => Number(x.balance) < 0)
+  const consumed = held.reduce((n, x) => n + Number(x.consumed ?? 0), 0)
+
+  async function saveReorder(x: StockLevel, value: number) {
+    const { error } = await supabase
+      .from('ff_material_plants')
+      .update({ reorder_level: value })
+      .eq('material_id', x.material_id)
+      .eq('plant_id', x.plant_id)
+    if (!error) { setEditing(null); refresh() }
+  }
 
   return (
     <div className="space-y-5">
-      <header>
-        <h1 className="text-xl font-semibold text-slate-900">Material In / Out</h1>
-        <p className="text-sm text-slate-500">
-          Every movement in and out of the store{plant ? ' at ' + plant.short_name : ' across both companies'}. Stock balances derive from this ledger.
-        </p>
+      <header className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-900">Raw Material</h1>
+          <p className="text-sm text-slate-500">
+            What is bought in and consumed{plant ? ' at ' + plant.short_name : ' across both companies'}.
+            Buying is entered here; a production run takes out what it used by itself.
+          </p>
+        </div>
+        {plant && manage && (
+          <Button variant={showNew ? 'ghost' : 'primary'} onClick={() => setShowNew((v) => !v)}>
+            {showNew ? 'Cancel' : '+ Add article'}
+          </Button>
+        )}
       </header>
 
+      {showNew && plant && data && (
+        <Card title={'Add an article to ' + plant.short_name}>
+          <AddMaterialForm
+            plantId={plant.id}
+            existing={data.stock}
+            allMaterials={data.materials}
+            allowedRoles={HELD_HERE}
+            onDone={() => { setShowNew(false); refresh() }}
+          />
+        </Card>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Stat label="Articles held" value={held.length} sub="raw and work in progress" />
+        <Stat
+          label="Below reorder level"
+          value={low.length}
+          sub={low.length ? low.map((l) => l.code).join(', ') : 'nothing to raise'}
+          tone={low.length ? 'warn' : 'good'}
+        />
+        <Stat label="Consumed to date" value={fmtQty(consumed)} sub="taken by production runs" />
+        <Stat
+          label="Negative balance"
+          value={negative.length}
+          sub={negative.length ? 'ledger needs a correction' : 'ledger is clean'}
+          tone={negative.length ? 'bad' : 'good'}
+        />
+      </div>
+
       {plant ? (
-        <Card title={'Record a movement · ' + plant.short_name}>
+        <Card title={'Record a purchase · ' + plant.short_name}>
           {loading && !data ? <Spinner /> : data && (
-            <EntryForm plantId={plant.id} stock={data.stock} orders={data.orders} onDone={refresh} />
+            <EntryForm plantId={plant.id} stock={held} orders={data.orders} onDone={refresh} />
           )}
         </Card>
       ) : (
-        <NeedPlant what="record a movement" />
+        <NeedPlant what="record a purchase" />
+      )}
+
+      {/* The balance itself, so nobody has to add the ledger up in their head. */}
+      {loading && !data ? <Spinner /> : (
+        <>
+          {HELD_HERE.map((role) => {
+            const inRole = held.filter((x) => x.role === role)
+            if (inRole.length === 0) return null
+            return (
+              <Card key={role} title={STOCK_ROLE_LABEL[role]}>
+                <p className="-mt-1 mb-3 text-xs text-slate-500">{ROLE_HINT[role]}</p>
+                <RoleTable
+                  role={role}
+                  rows={inRole}
+                  scope={scope}
+                  onEditReorder={saveReorder}
+                  editing={editing}
+                  setEditing={setEditing}
+                />
+                {role === 'raw' && (
+                  <p className="mt-3 text-xs text-slate-500">Click a reorder level to change it for that company.</p>
+                )}
+              </Card>
+            )
+          })}
+        </>
       )}
 
       <Card
-        title="Movement ledger"
+        title="Movements in and out"
         action={
           <div className="flex flex-wrap gap-2">
             <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as 'all' | Direction)} className="rounded-lg border border-slate-300 px-2 py-1 text-sm">
@@ -239,7 +326,7 @@ export default function Materials() {
           className={inputCls + ' mb-3 sm:max-w-sm'}
         />
 
-        {loading ? <Spinner /> : error ? <ErrorBox error={error} onRetry={refresh} /> : rows.length === 0 ? (
+        {loading ? <Spinner /> : error ? <ErrorBox error={error} onRetry={refresh} /> : ledger.length === 0 ? (
           <Empty>No movements in this period.</Empty>
         ) : (
           <>
@@ -261,7 +348,7 @@ export default function Materials() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {rows.map((t) => (
+                  {ledger.map((t) => (
                     <tr key={t.id} className="hover:bg-slate-50">
                       {scope === 'group' && <td className="py-2"><PlantTag code={byId(t.plant_id)?.code} /></td>}
                       <td className="py-2 whitespace-nowrap text-slate-600">{fmtDate(t.txn_date)}</td>
