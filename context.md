@@ -170,13 +170,18 @@ Which rows are open is held in the page component, not in `WorkerRow` — that i
 declared inside `Attendance` and so remounts on every render, which is also why the
 overtime input is uncontrolled.
 
-**One date per page, and always with the month in words.** A page about a single
-day carried it three times — in the picker and again in each card heading — all as
-`2026-08-30`. It is now said once, under the page title, with its weekday, because
-whether a day is a Sunday is exactly what an attendance page is asked. Everywhere
-else a date is rendered through `fmtDate`, never printed raw: an ISO date with a
-numeric month gets misread, and the browser's own date input can only show numbers,
-which is the other reason the spelled-out one is there.
+**The date is said once, and the caption under the picker is not a repeat of it.**
+A page about a single day carried its date three times — in the picker and again in
+each card heading. The picker is now the only thing that says *which* day; under it
+sits the one thing a date input cannot express, which is where that day stands:
+`Sunday · today`, `Saturday · yesterday`, `Friday · 2 days ago`. It turns amber the
+moment it is not today, because entering a day's attendance against the wrong date
+is the easiest mistake to make here and the hardest to notice afterwards. The
+weekday rides along because an attendance page is often really asking whether the
+day was a Sunday.
+
+Everywhere a date is printed as text rather than picked, it goes through `fmtDate`
+so the month is a word: a numeric ISO date gets misread.
 
 **Clock times are always twelve hour.** The floor says half past eight, never twenty
 thirty, and a night shift written `20:00` is read wrong more often than it is read.

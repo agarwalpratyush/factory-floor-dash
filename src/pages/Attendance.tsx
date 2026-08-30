@@ -7,7 +7,7 @@ import {
   Badge, Button, Card, Empty, ErrorBox, Field, inputCls,
   NeedPlant, PlantTag, Spinner, Stat,
 } from '../components/ui'
-import { daysAgo, fmtDateLong, fmtNum, fmtTime, today } from '../lib/format'
+import { daysAgo, fmtNum, fmtTime, relativeDay, today } from '../lib/format'
 import {
   ALL_DEPTS, ATTENDANCE_LABEL, DEPTS_BY_PLANT, DEPT_GROUPING_MIN, DESIGNATIONS, SHIFTS,
 } from '../lib/types'
@@ -843,15 +843,18 @@ export default function Attendance() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-slate-900">Attendance</h1>
-          {/* The one place the day is spelled out. The picker beside it can only
-              show numbers, and the cards below no longer repeat it. */}
-          <p className="text-sm text-slate-500">
-            {fmtDateLong(date)}
-            {date === today() && <span className="text-slate-400"> · today</span>}
-          </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} className={inputCls + ' w-auto'} />
+        <div className="flex flex-wrap items-start gap-2">
+          <div>
+            <input type="date" value={date} max={today()} onChange={(e) => setDate(e.target.value)} className={inputCls + ' w-auto'} />
+            {/* Not the date again - where it sits. A picker can only show numbers. */}
+            <p className={
+              'mt-1 text-right text-xs ' +
+              (date === today() ? 'text-slate-500' : 'text-amber-700')
+            }>
+              {relativeDay(date)}
+            </p>
+          </div>
           {plant && manage && (
             <Button variant={showNew ? 'ghost' : 'primary'} onClick={() => setShowNew((s) => !s)}>
               {showNew ? 'Cancel' : '+ Worker'}
