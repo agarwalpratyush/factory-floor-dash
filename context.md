@@ -224,6 +224,19 @@ gone and a day carries as many lots as it needs, each with its own count and rat
 authorship now, not an administrator — removing a line you just typed should not
 need somebody else.
 
+**Leaving has a date, not a switch.** `ff_workers.left_on` is the last working day:
+somebody who left on the 12th belongs on the 12th and on every day before it, and
+appears on none after. A boolean cannot say that, so the Attendance page filters on
+`left_on is null or left_on >= the date being viewed` rather than on `active`.
+`active` still exists because much of the app filters on it, but a trigger derives
+it from `left_on` — two flags kept in step by hand always drift apart. Rejoining
+clears the date and nothing else: same code, same wage, every day still theirs.
+
+**Adding and editing a worker live on the two header buttons, `+` and the pencil**,
+not on the attendance rows. A row is for marking somebody present; an Edit button on
+every one of them put a rarely-used control in the busiest place on the page.
+Rejoining sits under `+` because coming back is the same event as joining.
+
 **A worker profile is editable; the days behind it are not.** Everything on
 `ff_workers` can be changed except `code` — the code is how a person is identified
 on the paper register and on every day already recorded, so it is read-only once the

@@ -7,7 +7,7 @@ import {
   Badge, Button, Card, Empty, ErrorBox, Field, inputCls,
   NeedPlant, PlantTag, Spinner, Stat,
 } from '../components/ui'
-import { daysAgo, fmtNum, fmtTime, relativeDay, today } from '../lib/format'
+import { daysAgo, fmtDate, fmtNum, fmtTime, relativeDay, today } from '../lib/format'
 import {
   ALL_DEPTS, ATTENDANCE_LABEL, DEPTS_BY_PLANT, DEPT_GROUPING_MIN, DESIGNATIONS, SHIFTS,
 } from '../lib/types'
@@ -52,7 +52,9 @@ const STATUS_SHORT: Record<AttendanceStatus, string> = {
 async function loadDay(scope: PlantScope, date: string) {
   // Group staff (plant_id null) are marked in Combined View only - they are not
   // any one company's headcount, and marking them under a company would imply they are.
-  let wq = supabase.from('ff_workers').select('*').eq('active', true).order('code')
+  // Everyone, then split by the date being viewed: somebody who left on the 12th
+  // belongs on the 12th and on every day before it, and nowhere after.
+  let wq = supabase.from('ff_workers').select('*').order('code')
   if (scope !== 'group') wq = wq.eq('plant_id', scope)
 
   let lq = supabase.from('ff_daily_labour').select('*').eq('work_date', date)
@@ -66,10 +68,13 @@ async function loadDay(scope: PlantScope, date: string) {
   const failed = [workers, att, labour].find((r) => r.error)
   if (failed?.error) throw new Error(failed.error.message)
 
-  const wk = (workers.data ?? []) as Worker[]
+  const all = (workers.data ?? []) as Worker[]
+  const wk = all.filter((w) => w.left_on === null || w.left_on >= date)
   const ids = new Set(wk.map((w) => w.id))
   return {
     workers: wk,
+    // Kept separately so they can be offered back, not so they can be marked.
+    departed: all.filter((w) => w.left_on !== null),
     // ff_attendance carries no plant_id - it inherits the plant of its worker
     att: ((att.data ?? []) as Att[]).filter((a) => ids.has(a.worker_id)),
     labour: (labour.data ?? []) as DailyLabour[],
@@ -117,11 +122,12 @@ function WorkerForm({
     notes: worker?.notes ?? '',
     group: editing ? worker.plant_id === null : false,
     ot_eligible: worker?.ot_eligible ?? true,
-    active: worker?.active ?? true,
   })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [confirming, setConfirming] = useState(false)
+  // Leaving is its own action with its own date, not a checkbox on the form.
+  const [leaving, setLeaving] = useState<string | null>(null)
 
   // How many days already stand against this person. It decides whether they can
   // be removed at all, so it is worth knowing before the button is offered.
@@ -154,12 +160,25 @@ function WorkerForm({
       date_joined: f.date_joined || null,
       notes: f.notes.trim() || null,
       ot_eligible: f.ot_eligible,
-      active: f.active,
     }
     const { error } = worker
       ? await supabase.from('ff_workers').update(fields).eq('id', worker.id)
       : await supabase.from('ff_workers').insert({ ...fields, code: f.code.trim().toUpperCase() })
     setBusy(false)
+    if (error) setErr(error.message)
+    else onDone()
+  }
+
+  async function markLeft(lastDay: string) {
+    if (!worker) return
+    setBusy(true)
+    setErr(null)
+    const { error } = await supabase
+      .from('ff_workers')
+      .update({ left_on: lastDay })
+      .eq('id', worker.id)
+    setBusy(false)
+    setLeaving(null)
     if (error) setErr(error.message)
     else onDone()
   }
@@ -227,11 +246,6 @@ function WorkerForm({
         <input type="checkbox" checked={f.ot_eligible} onChange={(e) => setF({ ...f, ot_eligible: e.target.checked })} className="h-4 w-4 rounded" />
         Draws overtime
       </label>
-      <label className="flex items-end gap-2 pb-2 text-sm text-slate-700">
-        <input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} className="h-4 w-4 rounded" />
-        On the rolls
-      </label>
-
       {err && <p className="text-sm text-red-600 sm:col-span-2 lg:col-span-3">{err}</p>}
 
       <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
@@ -240,10 +254,29 @@ function WorkerForm({
         </Button>
         {editing && <Button type="button" variant="ghost" onClick={onDone}>Cancel</Button>}
 
-        {editing && days !== null && days > 0 && (
+        {editing && worker.left_on === null && leaving === null && (
+          <Button type="button" variant="ghost" onClick={() => setLeaving(today())}>
+            Mark as left
+          </Button>
+        )}
+        {editing && leaving !== null && (
+          <span className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+            Last working day
+            <input
+              type="date"
+              value={leaving}
+              onChange={(e) => setLeaving(e.target.value)}
+              className="rounded-md border border-slate-300 px-1.5 py-1 text-xs"
+            />
+            <Button type="button" variant="ghost" onClick={() => setLeaving(null)}>Cancel</Button>
+            <Button type="button" disabled={busy} onClick={() => markLeft(leaving)}>Confirm</Button>
+          </span>
+        )}
+
+        {editing && days !== null && days > 0 && leaving === null && (
           <span className="ml-auto text-xs text-slate-500">
-            {days} day{days === 1 ? '' : 's'} recorded, so this person cannot be deleted.
-            Untick <em>On the rolls</em> to take them off the floor and keep the record.
+            {days} day{days === 1 ? '' : 's'} recorded, so this person cannot be deleted —
+            mark them as left instead and the record stays.
           </span>
         )}
         {editing && days === 0 && !confirming && (
@@ -410,14 +443,15 @@ export default function Attendance() {
   const money = can('ff_money')
   const manage = can('ff_manage')
   const [date, setDate] = useState(today())
-  const [showNew, setShowNew] = useState(false)
+  // The two header buttons open one panel between them, never both at once.
+  const [panel, setPanel] = useState<'add' | 'edit' | null>(null)
   const [saving, setSaving] = useState<number | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [siteFor, setSiteFor] = useState<Record<number, number>>({})
   // Which rows have their detail strip open. Held here rather than in WorkerRow,
   // which is declared inside this component and so remounts on every render.
   const [openRow, setOpenRow] = useState<Record<number, boolean>>({})
-  // Whose profile is open for editing. One at a time - it is a whole form.
+  // Whose profile is open inside the edit panel. One at a time - it is a whole form.
   const [editId, setEditId] = useState<number | null>(null)
   // Whose day is waiting on a second press before it is cleared, because clearing
   // it would take a remark or hours down with it.
@@ -529,6 +563,20 @@ export default function Attendance() {
     else { day.refresh(); month.refresh() }
   }
 
+  /** Coming back clears the leaving date. Everything else about them is untouched:
+   *  same code, same wage, and every day they ever worked still theirs. */
+  async function rejoin(worker: Worker) {
+    setSaving(worker.id)
+    setErr(null)
+    const { error } = await supabase
+      .from('ff_workers')
+      .update({ left_on: null })
+      .eq('id', worker.id)
+    setSaving(null)
+    if (error) setErr(error.message)
+    else day.refresh()
+  }
+
   async function markAllPresent() {
     const unmarked = (day.data?.workers ?? []).filter((w) => !byWorker.has(w.id))
     if (unmarked.length === 0) return
@@ -563,6 +611,10 @@ export default function Attendance() {
   const marked = workers.filter((w) => byWorker.has(w.id)).length
   const present = workers.filter((w) => byWorker.get(w.id)?.status === 'present').length
   const absent = workers.filter((w) => byWorker.get(w.id)?.status === 'absent').length
+
+  // People who have left. They are not on any list to be marked, only on the
+  // one offering them back.
+  const departed = day.data?.departed ?? []
 
   const labour = day.data?.labour ?? []
   const casual = labour.reduce((s, l) => s + Number(l.head_count), 0)
@@ -653,16 +705,7 @@ export default function Attendance() {
         )}
         {!cur && <Badge tone="amber">not marked</Badge>}
 
-        {manage && (
-          <button
-            onClick={() => setEditId(editId === w.id ? null : w.id)}
-            aria-expanded={editId === w.id}
-            title={'Edit ' + w.name + "'s profile"}
-            className="rounded-md px-2 py-1 text-xs text-slate-500 ring-1 ring-slate-300 transition hover:bg-slate-100"
-          >
-            Edit
-          </button>
-        )}
+
 
         {confirmClear === w.id && (
           <span className="flex items-center gap-2 text-xs text-amber-800">
@@ -824,16 +867,6 @@ export default function Attendance() {
           </div>
         )}
 
-        {editId === w.id && (
-          <div className="w-full border-t border-slate-200 pt-3">
-            <WorkerForm
-              plantId={w.plant_id ?? plant?.id ?? null}
-              plantCode={w.plant_id !== null ? byId(w.plant_id)?.code ?? null : null}
-              worker={w}
-              onDone={() => { setEditId(null); day.refresh() }}
-            />
-          </div>
-        )}
       </li>
     )
   }
@@ -855,20 +888,128 @@ export default function Attendance() {
               {relativeDay(date)}
             </p>
           </div>
-          {plant && manage && (
-            <Button variant={showNew ? 'ghost' : 'primary'} onClick={() => setShowNew((s) => !s)}>
-              {showNew ? 'Cancel' : '+ Worker'}
-            </Button>
+          {manage && (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => { setPanel(panel === 'add' ? null : 'add'); setEditId(null) }}
+                aria-pressed={panel === 'add'}
+                aria-label="Add a worker, or bring back someone who left"
+                title="Add a worker, or bring back someone who left"
+                className={
+                  'flex h-9 w-9 items-center justify-center rounded-lg text-lg leading-none ring-1 transition ' +
+                  (panel === 'add'
+                    ? 'bg-blue-600 text-white ring-blue-600'
+                    : 'bg-white text-slate-600 ring-slate-300 hover:bg-slate-50')
+                }
+              >
+                +
+              </button>
+              <button
+                onClick={() => { setPanel(panel === 'edit' ? null : 'edit'); setEditId(null) }}
+                aria-pressed={panel === 'edit'}
+                aria-label="Edit a worker"
+                title="Edit a worker"
+                className={
+                  'flex h-9 w-9 items-center justify-center rounded-lg ring-1 transition ' +
+                  (panel === 'edit'
+                    ? 'bg-blue-600 text-white ring-blue-600'
+                    : 'bg-white text-slate-600 ring-slate-300 hover:bg-slate-50')
+                }
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75}
+                     strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-4 w-4">
+                  <path d="M12 20h9" />
+                  <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+              </button>
+            </div>
           )}
         </div>
       </header>
 
-      {showNew && plant && (
-        <Card title={'New worker · ' + plant.short_name}>
-          <WorkerForm plantId={plant.id} plantCode={plant.code} onDone={() => { setShowNew(false); day.refresh() }} />
+      {panel === 'add' && (
+        <Card title={plant ? 'Add a worker · ' + plant.short_name : 'Add a worker'}>
+          {plant ? (
+            <WorkerForm
+              plantId={plant.id}
+              plantCode={plant.code}
+              onDone={() => { setPanel(null); day.refresh() }}
+            />
+          ) : (
+            <NeedPlant what="add a worker" />
+          )}
+
+          {/* Coming back is the same event as joining, so it lives under the same
+              button. Their record is still here; it only needs its date clearing. */}
+          {departed.length > 0 && (
+            <div className="mt-5 border-t border-slate-100 pt-4">
+              <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                Rejoining
+                <span className="ml-1 font-normal text-slate-400">({departed.length})</span>
+              </h3>
+              <ul className="space-y-2">
+                {departed.map((w) => (
+                  <li key={w.id} className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
+                    <span className="font-medium text-slate-900">{w.name}</span>
+                    <span className="text-xs text-slate-500">
+                      {w.code} · left {fmtDate(w.left_on)}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      className="ml-auto"
+                      disabled={saving === w.id}
+                      onClick={() => rejoin(w)}
+                    >
+                      Bring back
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-slate-500">
+                Their code, wage and every day they worked come back with them.
+              </p>
+            </div>
+          )}
         </Card>
       )}
-      {!plant && <NeedPlant what="add a worker or record daily labour" />}
+
+      {panel === 'edit' && (
+        <Card title="Edit a worker">
+          {workers.length === 0 ? (
+            <Empty>Nobody to edit here.</Empty>
+          ) : (
+            <ul className="space-y-2">
+              {workers.map((w) => (
+                <li key={w.id} className="rounded-lg bg-slate-50 px-3 py-2 ring-1 ring-slate-200">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="font-medium text-slate-900">{w.name}</span>
+                    <span className="text-xs text-slate-500">
+                      {w.code}{w.designation ? ' · ' + w.designation : ''}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      className="ml-auto"
+                      onClick={() => setEditId(editId === w.id ? null : w.id)}
+                    >
+                      {editId === w.id ? 'Close' : 'Edit'}
+                    </Button>
+                  </div>
+                  {editId === w.id && (
+                    <div className="mt-3 border-t border-slate-200 pt-3">
+                      <WorkerForm
+                        plantId={w.plant_id ?? plant?.id ?? null}
+                        plantCode={w.plant_id !== null ? byId(w.plant_id)?.code ?? null : null}
+                        worker={w}
+                        onDone={() => { setEditId(null); day.refresh() }}
+                      />
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+      )}
 
       {err && <ErrorBox error={err} />}
 

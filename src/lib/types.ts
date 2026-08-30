@@ -115,6 +115,9 @@ export interface Worker {
   shift_default: string
   daily_wage: number | null
   date_joined: string | null
+  /** Last working day. Null means still with us; set, they drop off the list the
+   *  day after. Derived from it, `active` is never set by hand. */
+  left_on: string | null
   active: boolean
 }
 
