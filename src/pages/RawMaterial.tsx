@@ -98,7 +98,9 @@ function EntryForm({
       qty: weighed && mat ? toStored(Number(f.qty), entryUnit, mat.unit) : Number(f.qty),
       // Counted, not converted. Blank means nobody counted, which is not zero.
       qty_packs: f.packs ? Number(f.packs) : null,
-      qty_sqm: f.sqm ? Number(f.sqm) : null,
+      // Left null on purpose: nothing computes it yet, and a hand-typed area
+      // would have to be unpicked once the formula arrives.
+      qty_sqm: null,
       unit_rate: f.unit_rate ? Number(f.unit_rate) : null,
       party: f.party.trim() || null,
       ref_no: f.ref_no.trim() || null,
@@ -173,14 +175,14 @@ function EntryForm({
             />
           </Field>
         )}
+        {/* Square metres are not asked for. They will be worked out from the
+             article's size once the formulas are settled; typing them now would
+             produce numbers the formula later contradicts. */}
         {mat?.sold_by_area && (
           <Field label="Square metres">
-            <input
-              type="number" step="0.001" min="0"
-              value={f.sqm} onChange={(e) => setF({ ...f, sqm: e.target.value })}
-              className={inputCls}
-              placeholder="if measured"
-            />
+            <div className={inputCls + ' bg-slate-50 text-slate-500'}>
+              worked out from the size
+            </div>
           </Field>
         )}
         <Field label="Rate per unit (₹)">

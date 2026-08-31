@@ -290,17 +290,21 @@ export function RoleTable({
                 )}
                 <td className={'py-2 text-right font-semibold tabular-nums ' + (neg ? 'text-red-600' : low ? 'text-amber-600' : 'text-slate-900')}>
                   {fmtWeight(s.balance, s.unit)}
-                  {(Number(s.packs_seen) > 0 || Number(s.sqm_seen) > 0) && (
+                  {(Number(s.packs_seen) > 0 || Number(s.sqm_seen) > 0 || s.sold_by_area) && (
                     <div className="text-xs font-normal text-slate-500">
                       {Number(s.packs_seen) > 0 && (
                         <span title={Number(s.packs_seen) + ' of ' + s.movements + ' movements counted'}>
                           {fmtQty(s.packs_balance)} {s.pack_unit}s
                         </span>
                       )}
-                      {Number(s.packs_seen) > 0 && Number(s.sqm_seen) > 0 && ' · '}
-                      {Number(s.sqm_seen) > 0 && (
+                      {Number(s.packs_seen) > 0 && (Number(s.sqm_seen) > 0 || s.sold_by_area) && ' · '}
+                      {Number(s.sqm_seen) > 0 ? (
                         <span title={Number(s.sqm_seen) + ' of ' + s.movements + ' movements measured'}>
                           {fmtQty(s.sqm_balance)} sqm
+                        </span>
+                      ) : s.sold_by_area && (
+                        <span className="text-slate-400" title="Worked out from the article's size once the formula is set">
+                          sqm pending
                         </span>
                       )}
                     </div>

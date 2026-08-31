@@ -80,8 +80,17 @@ is recounted, not divided.
 constraint refuses a purchase with no count. The constraint is deliberately
 `NOT VALID`: the seventeen purchases already on the books predate the field and
 cannot be counted retrospectively, so the rule binds every row written from here,
-which is the part that can be true. Square metres and a weighed amount stay
-optional, because those genuinely are not always taken.
+which is the part that can be true. A weighed amount stays optional, because that
+genuinely is not always taken.
+
+**Square metres are not entered at all — they will be calculated.** Pratyush has the
+formulas and will supply them when Agarwal work resumes; until then the entry form
+shows *worked out from the size* where the field would be, and an article with
+`sold_by_area` reads *sqm pending* on its balance. `ff_material_txns.qty_sqm` exists
+and nothing writes it. **Do not invent an area formula, and do not restore the input:**
+a hand-typed area would have to be unpicked the day the real one lands. `ff_materials.spec`
+already carries the dimensions it will need. The open question to put to him is whether
+a gabion box's quoted area counts the diaphragms.
 
 **The second and third measures are observed, never derived.** A coil is not a
 standard weight, a bag is not reliably 25 kg, and a mesh roll is weighed rather than
