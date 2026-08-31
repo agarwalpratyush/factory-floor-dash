@@ -123,9 +123,9 @@ export function CoilEntryGrid({
   const [err, setErr] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
 
-  const giOpts = stock.filter((s) => s.code.startsWith('GIW'))
-  const pvcOpts = stock.filter((s) => s.code.startsWith('PVCW'))
-  const granOpts = stock.filter((s) => s.code.startsWith('PVCG') || s.code.startsWith('MB'))
+  const giOpts = stock.filter((s) => s.role === 'raw' && s.category === 'Base Wire')
+  const granOpts = stock.filter((s) => s.role === 'raw' && s.category === 'Polymer')
+  const pvcOpts = stock.filter((s) => s.role === 'finished' && s.category === 'Polymer Coated GI Wire')
 
   function setRow(i: number, patch: Partial<CoilRow>) {
     setRows((r) => r.map((x, n) => (n === i ? { ...x, ...patch } : x)))
@@ -176,7 +176,7 @@ export function CoilEntryGrid({
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (filled.length === 0) { setErr('Enter at least one coil.'); return }
-    if (granules <= 0) { setErr('Total coated weight must exceed total GI weight — check the figures.'); return }
+    if (granules <= 0) { setErr('Total coated weight must exceed total base wire weight — check the figures.'); return }
 
     setBusy(true)
     setErr(null)
@@ -205,7 +205,7 @@ export function CoilEntryGrid({
     setBusy(false)
     if (error) { setErr(error.message); return }
     setOk('Shift log #' + data + ' saved. ' + fmtNum(giTotal / 1000, 3) + ' MT GI and ' +
-      fmtNum(granules, 1) + ' kg granules consumed, ' + fmtNum(pvcTotal / 1000, 3) + ' MT coated wire into stock.')
+      fmtNum(granules, 1) + ' kg polymer consumed, ' + fmtNum(pvcTotal / 1000, 3) + ' MT coated wire into stock.')
     setRows(Array.from({ length: 10 }, blankRow))
     onDone()
   }
@@ -229,22 +229,22 @@ export function CoilEntryGrid({
         <Field label="Size (mm)">
           <input type="number" step="0.001" value={head.nominal_size_mm} onChange={(e) => setHead({ ...head, nominal_size_mm: e.target.value })} className={inputCls} />
         </Field>
-        <Field label="GI wire used *">
+        <Field label="Base Wire Used *">
           <select required value={head.gi_material_id} onChange={(e) => setHead({ ...head, gi_material_id: e.target.value })} className={inputCls}>
             <option value="">Select…</option>
             {giOpts.map((s) => <option key={s.material_id} value={s.material_id}>{s.code} — {s.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Polymer Used *">
+          <select required value={head.granule_material_id} onChange={(e) => setHead({ ...head, granule_material_id: e.target.value })} className={inputCls}>
+            <option value="">Select…</option>
+            {granOpts.map((s) => <option key={s.material_id} value={s.material_id}>{s.code} — {s.name}</option>)}
           </select>
         </Field>
         <Field label="Coated wire produced *">
           <select required value={head.pvc_material_id} onChange={(e) => setHead({ ...head, pvc_material_id: e.target.value })} className={inputCls}>
             <option value="">Select…</option>
             {pvcOpts.map((s) => <option key={s.material_id} value={s.material_id}>{s.code} — {s.name}</option>)}
-          </select>
-        </Field>
-        <Field label="Granules used *">
-          <select required value={head.granule_material_id} onChange={(e) => setHead({ ...head, granule_material_id: e.target.value })} className={inputCls}>
-            <option value="">Select…</option>
-            {granOpts.map((s) => <option key={s.material_id} value={s.material_id}>{s.code} — {s.name}</option>)}
           </select>
         </Field>
         <Field label="Target PVC size (mm)">
@@ -270,7 +270,7 @@ export function CoilEntryGrid({
             <thead>
               <tr className="text-xs tracking-wide text-slate-500 uppercase">
                 <th className="w-8 pb-1 text-left font-medium">#</th>
-                <th className="pb-1 text-right font-medium">GI wire (kg)</th>
+                <th className="pb-1 text-right font-medium">Base wire (kg)</th>
                 <th className="pb-1 text-right font-medium">GI size</th>
                 <th className="pb-1 text-right font-medium">PVC wire (kg)</th>
                 <th className="pb-1 text-right font-medium">PVC size</th>
@@ -309,7 +309,7 @@ export function CoilEntryGrid({
           </table>
         </div>
         <p className="mt-2 text-xs text-slate-500">
-          Paste into the first GI wire box to fill many rows at once — a leading serial number is ignored.
+          Paste into the first base wire box to fill many rows at once — a leading serial number is ignored.
         </p>
       </div>
 
@@ -327,7 +327,7 @@ export function CoilEntryGrid({
           <div className="text-lg font-semibold tabular-nums">{fmtNum(pvcTotal, 3)} kg</div>
         </div>
         <div>
-          <div className="text-xs text-slate-500 uppercase">Granules (derived)</div>
+          <div className="text-xs text-slate-500 uppercase">Polymer (derived)</div>
           <div className={'text-lg font-semibold tabular-nums ' + (granules <= 0 ? 'text-red-600' : 'text-slate-900')}>
             {fmtNum(granules, 3)} kg
           </div>

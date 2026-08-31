@@ -238,7 +238,7 @@ export default function Production() {
   const subtitle = !plant
     ? 'Every run at both companies — coating shifts and fabrication alike.'
     : coating
-      ? 'GI wire + PVC granules → PVC coated wire, recorded coil by coil.'
+      ? 'Base wire + polymer → polymer coated GI wire, recorded coil by coil.'
       : 'GI wire → DT mesh rolls → gabion boxes.'
 
   const granulesShown = [...coilByRun.values()].reduce((s, c) => s + Number(c.granules_used), 0)
@@ -338,7 +338,7 @@ export default function Production() {
       {!loading && coilByRun.size > 0 && (
         <p className="text-xs text-slate-500">
           Coating shifts carry their coil count and pickup. Open one to see every coil, with
-          slipped digits and out-of-tolerance diameters flagged. Granule use is derived from the
+          slipped digits and out-of-tolerance diameters flagged. Polymer use is derived from the
           weights — {fmtNum(granulesShown, 1)} kg across the shifts shown.
         </p>
       )}

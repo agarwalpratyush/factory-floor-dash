@@ -285,6 +285,12 @@ Two things fall out of it that the paper cannot give you:
   rather than a process event. Transcribe what the register says and let the system
   flag it; never silently correct the source document.
 
+The coil form asks in the floor's words — **Base Wire Used**, **Polymer Used**,
+then **Coated wire produced**, inputs before output. Its three dropdowns are filtered
+on category and role, not on how a code happens to start: the old `code.startsWith`
+tests silently left `MESH WIRE` out of the wire list, because a real article does not
+have to follow a naming convention invented before it existed.
+
 A coating shift also posts an `ff_production` row underneath, which is why
 Production shows one run log for both companies and only the entry form differs.
 
