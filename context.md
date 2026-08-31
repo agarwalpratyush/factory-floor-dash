@@ -146,7 +146,7 @@ that column exists for:
 | | raw | finished |
 |---|---|---|
 | **coating** | Base Wire, Polymer | Polymer Coated GI Wire |
-| **fabrication** | Base Wire, Polymer Coated GI Wire | Gabion Box, Rolls, Mattress |
+| **fabrication** | GI Wire, Polymer Coated GI Wire | Gabion Box, Rolls, Mattress |
 
 **Base Wire is general on purpose and should stay that way.** The coating plant may
 take copper in later, and the category must not need renaming when it does — it was
@@ -156,10 +156,14 @@ and is named exactly, because it is the one thing the fabrication plant buys.
 is one polymer. A coated copper product would be a new article with its own
 category, which is the room Base Wire keeps open.
 
-Note that the four coated-wire articles are one article shared by both companies,
-so they carry **one** category — it reads correctly at both ends, as what Saffron
-makes and what Agarwal buys. Category is global to the article; only `role` is per
-company.
+**The category is per company, like `role`.** Saffron buys several kinds of wire so
+its bucket is Base Wire and must stay general; Agarwal buys GI and nothing else, so
+Base Wire there would be a generality that says nothing. The same coil is either,
+depending on who holds it — `GIW-2.20` reads **Base Wire** at Saffron and **GI
+Wire** at Agarwal, and is still one article, so a coil could still move between
+them. `ff_material_plants.category` holds the company's filing;
+`ff_materials.category` stays the article's general nature and keeps driving the
+pack word, which does *not* vary by company: a coil is a coil at both.
 
 A list of one is still a list: it says there is one answer, not that the question is
 missing. Offering Product on a raw page, or GI Wire on a finished one, invited

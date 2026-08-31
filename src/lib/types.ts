@@ -420,7 +420,8 @@ export const ALL_DEPTS = [
  * one line, and should follow a real article rather than precede one.
  */
 export const MATERIAL_CATEGORIES = [
-  'Base Wire', 'Polymer', 'Polymer Coated GI Wire', 'Gabion Box', 'Rolls', 'Mattress',
+  'Base Wire', 'GI Wire', 'Polymer', 'Polymer Coated GI Wire',
+  'Gabion Box', 'Rolls', 'Mattress',
 ]
 
 /**
@@ -434,16 +435,17 @@ export const MATERIAL_CATEGORIES = [
  * an article nobody makes.
  */
 export const CATEGORIES_FOR: Record<PlantProcess, Record<StockRole, string[]>> = {
-  // Base Wire stays general on purpose: the coating plant may take copper in
-  // later, and the category should not need renaming when it does. The coated
-  // output is the opposite case - it is named exactly, because it is the one
-  // thing the fabrication plant buys.
+  // The coating plant buys several kinds of wire and may take copper in later, so
+  // its bucket is general and should stay that way. The fabrication plant buys GI
+  // and nothing else, so Base Wire there would be a generality that says nothing -
+  // the same article is filed differently at each, which is why the category sits
+  // on the (material, plant) pair.
   coating: {
     raw: ['Base Wire', 'Polymer'],
     finished: ['Polymer Coated GI Wire'],
   },
   fabrication: {
-    raw: ['Base Wire', 'Polymer Coated GI Wire'],
+    raw: ['GI Wire', 'Polymer Coated GI Wire'],
     finished: ['Gabion Box', 'Rolls', 'Mattress'],
   },
 }
@@ -470,6 +472,7 @@ export const PACK_UNITS = ['coil', 'bag', 'piece']
 /** The pack word capitalised, for a field label rather than a sentence. */
 export const PACK_LABEL: Record<string, string> = {
   'Base Wire': 'Coils',
+  'GI Wire': 'Coils',
   'Polymer Coated GI Wire': 'Coils',
   Polymer: 'Bags',
   'Gabion Box': 'Pcs',
@@ -480,6 +483,7 @@ export const PACK_LABEL: Record<string, string> = {
 /** The usual pack word for a category. A default offered, not a rule enforced. */
 export const PACK_BY_CATEGORY: Record<string, string> = {
   'Base Wire': 'coil',
+  'GI Wire': 'coil',
   'Polymer Coated GI Wire': 'coil',
   Polymer: 'bag',
   'Gabion Box': 'piece',

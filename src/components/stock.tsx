@@ -103,6 +103,9 @@ export function AddMaterialForm({
     const { error } = await supabase.from('ff_material_plants').insert({
       material_id: data.id,
       plant_id: plantId,
+      // How this company files it. The article carries the same to begin with;
+      // they part company only where two companies file one article differently.
+      category: f.category,
       role,
       sellable: role === 'finished' ? true : sellable,
       opening_stock: src.opening_stock ? toStored(Number(src.opening_stock), openingUnit, STOCK_UNIT) : 0,
