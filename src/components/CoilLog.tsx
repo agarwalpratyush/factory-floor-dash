@@ -6,6 +6,14 @@ import { fmtNum, today } from '../lib/format'
 import { SHIFTS } from '../lib/types'
 import type { StockLevel } from '../lib/types'
 
+/**
+ * How far a measured diameter may sit from the target before the coil is flagged.
+ * Fixed for now, and stated on the form rather than offered as a field - the point
+ * is that the floor is told what it is being checked against, not asked to set it.
+ */
+const GI_TOLERANCE = 0.1
+const PVC_TOLERANCE = 0.05
+
 interface CoilRow { gi_weight: string; gi_size: string; pvc_weight: string; pvc_size: string }
 
 export interface CoilLogSummary {
@@ -76,8 +84,8 @@ export function CoilDetail({ log }: { log: CoilLogSummary }) {
           {data.map((e, i) => {
             const pickup = pickups[i]
             const odd = Math.abs(pickup - mean) > 6
-            const giBad = e.gi_size !== null && Math.abs(Number(e.gi_size) - Number(log.nominal_size_mm)) > 0.1
-            const pvcBad = e.pvc_size !== null && Math.abs(Number(e.pvc_size) - Number(log.target_pvc_size_mm)) > 0.05
+            const giBad = e.gi_size !== null && Math.abs(Number(e.gi_size) - Number(log.nominal_size_mm)) > GI_TOLERANCE
+            const pvcBad = e.pvc_size !== null && Math.abs(Number(e.pvc_size) - Number(log.target_pvc_size_mm)) > PVC_TOLERANCE
             return (
               <tr key={e.id} className={odd ? 'bg-red-50' : undefined}>
                 <td className="py-1.5 text-slate-500">{e.seq}</td>
@@ -129,8 +137,8 @@ export function CoilEntryGrid({
     setHead((prev) => ({
       ...prev,
       pvc_material_id: id,
-      nominal_size_mm: made?.core_mm != null ? String(made.core_mm) : prev.nominal_size_mm,
-      target_pvc_size_mm: made?.od_mm != null ? String(made.od_mm) : prev.target_pvc_size_mm,
+      nominal_size_mm: made?.core_mm != null ? String(made.core_mm) : '',
+      target_pvc_size_mm: made?.od_mm != null ? String(made.od_mm) : '',
     }))
   }
 
@@ -157,8 +165,10 @@ export function CoilEntryGrid({
       if (filled.length > 2 && Math.abs(p - pickup) > 6) out.push('pickup ' + p.toFixed(1) + '%')
       if (pvc <= gi) out.push('coated weight not above GI')
     }
-    if (r.gi_size && Math.abs(Number(r.gi_size) - Number(head.nominal_size_mm)) > 0.1) out.push('GI dia')
-    if (r.pvc_size && Math.abs(Number(r.pvc_size) - Number(head.target_pvc_size_mm)) > 0.05) out.push('PVC dia')
+    if (r.gi_size && head.nominal_size_mm
+      && Math.abs(Number(r.gi_size) - Number(head.nominal_size_mm)) > GI_TOLERANCE) out.push('GI dia')
+    if (r.pvc_size && head.target_pvc_size_mm
+      && Math.abs(Number(r.pvc_size) - Number(head.target_pvc_size_mm)) > PVC_TOLERANCE) out.push('PVC dia')
     return out
   }
 
@@ -244,14 +254,6 @@ export function CoilEntryGrid({
             {granOpts.map((s) => <option key={s.material_id} value={s.material_id}>{s.code} — {s.name}</option>)}
           </select>
         </Field>
-        <Field label="Base wire size (mm)">
-          <input type="number" step="0.001" value={head.nominal_size_mm} onChange={(e) => setHead({ ...head, nominal_size_mm: e.target.value })} className={inputCls} />
-          <p className="mt-1 text-xs text-slate-500">± 0.10 tolerance</p>
-        </Field>
-        <Field label="Coated size (mm)">
-          <input type="number" step="0.001" value={head.target_pvc_size_mm} onChange={(e) => setHead({ ...head, target_pvc_size_mm: e.target.value })} className={inputCls} />
-          <p className="mt-1 text-xs text-slate-500">± 0.05 tolerance</p>
-        </Field>
         <Field label="Date">
           <input type="date" value={head.log_date} onChange={(e) => setHead({ ...head, log_date: e.target.value })} className={inputCls} />
         </Field>
@@ -264,6 +266,31 @@ export function CoilEntryGrid({
           <input value={head.shift_label} onChange={(e) => setHead({ ...head, shift_label: e.target.value })} className={inputCls} placeholder="7 AM" />
         </Field>
       </div>
+
+      {/* Stated, not offered. The size comes off the article; a box here would
+          invite changing it, and two shifts of one product would drift apart. */}
+      <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600 ring-1 ring-slate-200">
+        {!head.pvc_material_id ? (
+          <>Choose the finished product above and its sizes will be checked against each coil.</>
+        ) : !head.nominal_size_mm && !head.target_pvc_size_mm ? (
+          <>
+            No size is set for this product, so nothing will be checked. Set it on{' '}
+            <strong>Finished Stock</strong>.
+          </>
+        ) : (
+          <>
+            Each coil is checked against{' '}
+            {head.nominal_size_mm && (
+              <><strong>{head.nominal_size_mm} mm</strong> base wire (± {GI_TOLERANCE})</>
+            )}
+            {head.nominal_size_mm && head.target_pvc_size_mm && ' and '}
+            {head.target_pvc_size_mm && (
+              <><strong>{head.target_pvc_size_mm} mm</strong> coated (± {PVC_TOLERANCE})</>
+            )}
+            . Anything outside that turns amber.
+          </>
+        )}
+      </p>
 
       <div>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">

@@ -286,13 +286,18 @@ Two things fall out of it that the paper cannot give you:
   flag it; never silently correct the source document.
 
 **A product's size belongs to the product.** `ff_materials.core_mm` and `od_mm`
-hold what an article is made to; choosing the Finished Product on a coil log fills
-both in, and the form states the tolerances beside them — 0.10 mm on the wire,
-0.05 mm on the coated diameter, which is what decides whether a coil turns amber.
-They remain editable per shift: a run can aim slightly off, and the article should
-not be rewritten from the shop floor to say so. What is fixed is that two shifts of
-the same article are no longer checked against whatever each typed that morning.
-Set them on Finished Stock, where the article lives.
+hold what an article is made to; choosing the Finished Product on a coil log brings
+both with it, and **the coil log has no box for either**. It states them in a
+sentence above the coils instead — *each coil is checked against 2.7 mm base wire
+(± 0.1) and 3.7 mm coated (± 0.05)* — because a box invites changing it, and two
+shifts of one product would then drift apart. Set them on Finished Stock, where the
+article lives.
+
+`GI_TOLERANCE` and `PVC_TOLERANCE` are named constants in `CoilLog.tsx`, used by
+both the entry form and the read-only view. They were literals buried in the flag
+test, deciding which coils turned amber without ever being shown to the person being
+judged by them. An article with no size set is checked against **nothing** rather
+than against a leftover default, and the sentence says so.
 
 The coil form asks in the floor's words — **Base Wire Used**, **Polymer Used**,
 then **Coated wire produced**, inputs before output. Its three dropdowns are filtered
