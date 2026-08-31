@@ -501,3 +501,12 @@ export const SHIFTS = [
   { value: 'B', label: 'Night (8 pm – 8 am)' },
   { value: 'G', label: 'General' },
 ]
+
+/**
+ * The same shifts, as a production log says them. `G` is *General* for a person -
+ * somebody not on a rota - but on a shift log it means a run that did not sit in
+ * either standard slot, which the floor calls custom. One stored value, two honest
+ * readings; do not collapse them into one word that fits neither.
+ */
+export const PRODUCTION_SHIFTS = SHIFTS.map((s) =>
+  s.value === 'G' ? { ...s, label: 'Custom' } : s)

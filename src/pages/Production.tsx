@@ -324,7 +324,7 @@ export default function Production() {
                     </div>
                     <div className="shrink-0 text-right text-xs text-slate-500">
                       <div>{fmtDate(r.prod_date)}</div>
-                      <div>{coil?.shift_label ? coil.shift_label : 'shift ' + r.shift}</div>
+                      <div>{coil?.shift_label ?? (r.shift === 'G' ? 'custom shift' : 'shift ' + r.shift)}</div>
                     </div>
                   </div>
                   {open && coil && <CoilDetail log={coil} />}

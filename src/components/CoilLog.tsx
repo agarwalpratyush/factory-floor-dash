@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useQuery } from '../lib/useQuery'
 import { Button, ErrorBox, Field, inputCls, Spinner } from '../components/ui'
 import { fmtNum, today } from '../lib/format'
-import { SHIFTS } from '../lib/types'
+import { PRODUCTION_SHIFTS } from '../lib/types'
 import type { StockLevel } from '../lib/types'
 
 /**
@@ -121,7 +121,7 @@ export function CoilEntryGrid({
   onDone: () => void
 }) {
   const [head, setHead] = useState({
-    log_date: today(), shift: 'A', shift_label: '7 AM',
+    log_date: today(), shift: 'A',
     nominal_size_mm: '2.600', target_pvc_size_mm: '3.600',
     gi_material_id: '', pvc_material_id: '', granule_material_id: '',
     power_cuts: '0', remarks: '',
@@ -217,7 +217,7 @@ export function CoilEntryGrid({
       })),
       p_log_date: head.log_date,
       p_shift: head.shift,
-      p_shift_label: head.shift_label.trim() || null,
+      p_shift_label: null,
       p_target_pvc_size_mm: Number(head.target_pvc_size_mm),
       p_power_cuts: Number(head.power_cuts) || 0,
       p_remarks: head.remarks.trim() || null,
@@ -235,6 +235,20 @@ export function CoilEntryGrid({
 
   return (
     <form onSubmit={submit} className="space-y-4">
+      {/* Which day this shift was is a header fact, not one of the things being
+          chosen, so it sits at the top right rather than in the run of fields. */}
+      <div className="flex items-center justify-end gap-2">
+        <label className="text-xs tracking-wide text-slate-500 uppercase" htmlFor="coil-log-date">
+          Shift date
+        </label>
+        <input
+          id="coil-log-date"
+          type="date" value={head.log_date} max={today()}
+          onChange={(e) => setHead({ ...head, log_date: e.target.value })}
+          className={inputCls + ' w-auto'}
+        />
+      </div>
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Finished Product *">
           <select required value={head.pvc_material_id} onChange={(e) => pickProduct(e.target.value)} className={inputCls}>
@@ -254,16 +268,10 @@ export function CoilEntryGrid({
             {granOpts.map((s) => <option key={s.material_id} value={s.material_id}>{s.code} — {s.name}</option>)}
           </select>
         </Field>
-        <Field label="Date">
-          <input type="date" value={head.log_date} onChange={(e) => setHead({ ...head, log_date: e.target.value })} className={inputCls} />
-        </Field>
         <Field label="Shift">
           <select value={head.shift} onChange={(e) => setHead({ ...head, shift: e.target.value })} className={inputCls}>
-            {SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+            {PRODUCTION_SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
-        </Field>
-        <Field label="As written on the sheet">
-          <input value={head.shift_label} onChange={(e) => setHead({ ...head, shift_label: e.target.value })} className={inputCls} placeholder="7 AM" />
         </Field>
       </div>
 

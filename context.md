@@ -285,6 +285,15 @@ Two things fall out of it that the paper cannot give you:
   rather than a process event. Transcribe what the register says and let the system
   flag it; never silently correct the source document.
 
+**`G` reads as *General* for a person and *Custom* for a shift log.** One stored
+value, two honest readings — somebody not on a rota, versus a run that sat in
+neither standard slot. `PRODUCTION_SHIFTS` relabels it for production only. Do not
+collapse the two into one word that fits neither.
+
+The coil log no longer transcribes the register's own shift wording; a log is filed
+under the shift itself, and `p_shift_label` is written null. Logs saved earlier keep
+the label they were given, which is why the list still reads it where it exists.
+
 **A product's size belongs to the product.** `ff_materials.core_mm` and `od_mm`
 hold what an article is made to; choosing the Finished Product on a coil log brings
 both with it, and **the coil log has no box for either**. It states them in a
