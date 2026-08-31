@@ -414,7 +414,7 @@ export function CoilEntryGrid({
                 return [coilRow, isStop ? (
                   <tr key={i + '-stop'}>
                     <td />
-                    <td colSpan={detailedShift ? 6 : 5} className="pt-0.5 pb-1.5">
+                    <td colSpan={detailedShift ? 5 : 4} className="pt-0.5 pb-1.5">
                       <div className="flex flex-wrap items-center gap-2">
                         <select
                           value={r.stop_reason}
@@ -435,6 +435,7 @@ export function CoilEntryGrid({
                         )}
                       </div>
                     </td>
+                    <td />
                   </tr>
                 ) : null]
               })}
