@@ -508,5 +508,26 @@ export const SHIFTS = [
  * either standard slot, which the floor calls custom. One stored value, two honest
  * readings; do not collapse them into one word that fits neither.
  */
+/**
+ * Why a coating line stops. A short list on purpose: the point of choosing from
+ * one is that two shifts describing the same stoppage write the same words, which
+ * free text never does. `Something else` keeps the honest escape hatch, and what
+ * shows up there repeatedly is the argument for a new entry here.
+ *
+ * POWER_CUT is named because the shift's power-cut count is derived by matching it.
+ */
+export const POWER_CUT = 'Power cut'
+
+export const STOP_REASONS = [
+  POWER_CUT,
+  'Raw material out of stock',
+  'Starting a new product',
+  'Machine breakdown',
+  'Maintenance',
+  'Wire break',
+  'Break or shift change',
+  'Something else',
+]
+
 export const PRODUCTION_SHIFTS = SHIFTS.map((s) =>
   s.value === 'G' ? { ...s, label: 'Custom' } : s)

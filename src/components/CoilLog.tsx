@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useQuery } from '../lib/useQuery'
 import { Button, ErrorBox, Field, inputCls, Spinner } from '../components/ui'
 import { fmtNum, fmtTime } from '../lib/format'
-import { PRODUCTION_SHIFTS } from '../lib/types'
+import { POWER_CUT, PRODUCTION_SHIFTS, STOP_REASONS } from '../lib/types'
 import type { StockLevel } from '../lib/types'
 
 /**
@@ -20,7 +20,9 @@ interface CoilRow {
    *  machine starting, the next is it stopping, the one after that is it starting
    *  again. Order of writing is order of happening, as in the margin of the sheet. */
   at_time: string
-  /** Why it stopped, on the coil it stopped at. */
+  /** Why it stopped, chosen from the list. */
+  stop_reason: string
+  /** Only used when the reason is the open one; otherwise the reason speaks. */
   stop_note: string
 }
 
@@ -57,7 +59,8 @@ interface CoilEntry {
 }
 
 const blankRow = (): CoilRow => ({
-  gi_weight: '', gi_size: '', pvc_weight: '', pvc_size: '', at_time: '', stop_note: '',
+  gi_weight: '', gi_size: '', pvc_weight: '', pvc_size: '',
+  at_time: '', stop_reason: '', stop_note: '',
 })
 
 /**
@@ -65,6 +68,14 @@ const blankRow = (): CoilRow => ({
  * the grid - only from how many times were written above it - so inserting a coil
  * or leaving rows blank cannot change what an existing time says.
  */
+/** The last reason is the open one; what it means is whatever was typed. */
+const OPEN_REASON = STOP_REASONS[STOP_REASONS.length - 1]
+
+/** What this coil's stoppage is recorded as. The open reason is never itself
+ *  stored - it stands in for the words the person wrote. */
+const stopReasonOf = (r: { stop_reason: string; stop_note: string }) =>
+  r.stop_reason === OPEN_REASON ? r.stop_note.trim() : r.stop_reason
+
 const timeRole = (writtenBefore: number) => (writtenBefore % 2 === 0 ? 'start' : 'stop')
 
 async function loadEntries(logId: number) {
@@ -144,7 +155,7 @@ export function CoilEntryGrid({
     shift: 'A',
     nominal_size_mm: '2.600', target_pvc_size_mm: '3.600',
     gi_material_id: '', pvc_material_id: '', granule_material_id: '',
-    power_cuts: '0', remarks: '',
+    remarks: '',
   })
   const [rows, setRows] = useState<CoilRow[]>(Array.from({ length: 10 }, blankRow))
   const [busy, setBusy] = useState(false)
@@ -210,7 +221,7 @@ export function CoilEntryGrid({
       return {
         gi_weight: take[0] ?? '', gi_size: take[1] ?? '',
         pvc_weight: take[2] ?? '', pvc_size: take[3] ?? '',
-        at_time: '', stop_note: '',
+        at_time: '', stop_reason: '', stop_note: '',
       }
     })
     setRows((prev) => {
@@ -247,7 +258,7 @@ export function CoilEntryGrid({
         pvc_weight: Number(r.pvc_weight),
         pvc_size: r.pvc_size ? Number(r.pvc_size) : null,
         at_time: r.at_time || null,
-        stop_note: r.stop_note || null,
+        stop_note: stopReasonOf(r) || null,
       })),
       p_log_date: logDate,
       p_shift: head.shift,
@@ -258,7 +269,7 @@ export function CoilEntryGrid({
       p_started_at: timesWritten[0] ?? null,
       p_stopped_at: timesWritten.length % 2 === 0 ? timesWritten[timesWritten.length - 1] ?? null : null,
       p_target_pvc_size_mm: Number(head.target_pvc_size_mm),
-      p_power_cuts: Number(head.power_cuts) || 0,
+      p_power_cuts: filled.filter((r) => stopReasonOf(r) === POWER_CUT).length,
       p_remarks: head.remarks.trim() || null,
       p_recorded_by: 'supervisor',
     })
@@ -404,12 +415,28 @@ export function CoilEntryGrid({
                   <tr key={i + '-stop'}>
                     <td />
                     <td colSpan={detailedShift ? 6 : 5} className="pt-0.5 pb-1.5">
-                      <input
-                        value={r.stop_note}
-                        onChange={(e) => setRow(i, { stop_note: e.target.value })}
-                        placeholder={'Why did it stop at ' + fmtTime(r.at_time) + '?'}
-                        className="w-full rounded border border-amber-300 bg-amber-50/60 px-2 py-1 text-xs"
-                      />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs text-amber-800">
+                          Stopped at {fmtTime(r.at_time)}
+                        </span>
+                        <select
+                          value={r.stop_reason}
+                          onChange={(e) => setRow(i, { stop_reason: e.target.value })}
+                          className="rounded border border-amber-300 bg-amber-50/60 px-2 py-1 text-xs"
+                        >
+                          <option value="">Why?</option>
+                          {STOP_REASONS.map((x) => <option key={x} value={x}>{x}</option>)}
+                        </select>
+                        {r.stop_reason === OPEN_REASON && (
+                          <input
+                            autoFocus
+                            value={r.stop_note}
+                            onChange={(e) => setRow(i, { stop_note: e.target.value })}
+                            placeholder="Say what happened"
+                            className="min-w-0 flex-1 rounded border border-amber-300 bg-amber-50/60 px-2 py-1 text-xs"
+                          />
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ) : null]
@@ -444,10 +471,7 @@ export function CoilEntryGrid({
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Power cuts this shift">
-          <input type="number" min="0" value={head.power_cuts} onChange={(e) => setHead({ ...head, power_cuts: e.target.value })} className={inputCls} />
-        </Field>
+      <div className="grid gap-3">
         <Field label="Remarks">
           <input value={head.remarks} onChange={(e) => setHead({ ...head, remarks: e.target.value })} className={inputCls} placeholder="lite off 2 time" />
         </Field>

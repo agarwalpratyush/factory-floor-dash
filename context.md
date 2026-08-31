@@ -295,7 +295,19 @@ the same thing, where one will do.
 starting again, **by how many times are written above it — not by row position**. So
 times in rows 1, 5 and 9 still read start, stop, start, and inserting a coil cannot
 change what an existing time says. Each filled box states which it is in words,
-because a column read this way is only safe if it says so. `stop_note` lives on the
+because a column read this way is only safe if it says so. A stoppage picks its reason from `STOP_REASONS` rather than typing one, so two
+shifts describing the same thing write the same words — which free text never does.
+*Something else* keeps the escape hatch, and what turns up there repeatedly is the
+argument for a new entry in the list. The open reason is never stored as itself;
+what gets written is what the person typed.
+
+**`power_cuts` is counted, not typed.** It is the number of stoppages whose reason
+is `POWER_CUT`. A number typed beside a list that can contradict it is exactly the
+kind of thing that drifts. Note the consequence: a Day or Night shift has no Time
+column, so it records no stoppages and no power cuts — if that matters, the fix is
+to let the column appear on every shift, not to bring the typed count back.
+
+`stop_note` lives on the
 coil the machine stopped at rather than on a row of its own — a row with no weights
 would be a coil that is not a coil, and every total would have to learn to skip it.
 
