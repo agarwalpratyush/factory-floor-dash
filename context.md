@@ -285,6 +285,19 @@ Two things fall out of it that the paper cannot give you:
   rather than a process event. Transcribe what the register says and let the system
   flag it; never silently correct the source document.
 
+**A custom shift can be logged coil by coil.** *Add more details* adds a Time
+column to the grid: `ff_coil_entries.at_time` reads as the machine starting, then
+stopping, then starting again, **by how many times are written above it — not by
+row position**. So times in rows 1, 4 and 6 still read start, stop, start, and
+inserting a coil cannot change what an existing time says. Each filled box states
+which it is in words, because a column read this way is only safe if it says so.
+
+It is opt-in, which is what makes it safe: the plain grid stays a transcription of
+the sheet and pasting a register still works, since a paste carries no times.
+`stop_note` lives on the coil the machine stopped at rather than on a row of its
+own — a row with no weights would be a coil that is not a coil, and every total
+would have to learn to skip it.
+
 **A custom shift says when the machine ran.** `ff_coil_logs.started_at` and
 `stopped_at` are asked for only when the shift is `G`; Day and Night carry their
 hours in their names. The span wraps past midnight, from the same helper the

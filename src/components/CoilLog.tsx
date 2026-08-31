@@ -14,7 +14,15 @@ import type { StockLevel } from '../lib/types'
 const GI_TOLERANCE = 0.1
 const PVC_TOLERANCE = 0.05
 
-interface CoilRow { gi_weight: string; gi_size: string; pvc_weight: string; pvc_size: string }
+interface CoilRow {
+  gi_weight: string; gi_size: string; pvc_weight: string; pvc_size: string
+  /** Only on a detailed log. Read down the column: the first time written is the
+   *  machine starting, the next is it stopping, the one after that is it starting
+   *  again. Order of writing is order of happening, as in the margin of the sheet. */
+  at_time: string
+  /** Why it stopped, on the coil it stopped at. */
+  stop_note: string
+}
 
 export interface CoilLogSummary {
   id: number
@@ -48,7 +56,16 @@ interface CoilEntry {
   pvc_size: number | null
 }
 
-const blankRow = (): CoilRow => ({ gi_weight: '', gi_size: '', pvc_weight: '', pvc_size: '' })
+const blankRow = (): CoilRow => ({
+  gi_weight: '', gi_size: '', pvc_weight: '', pvc_size: '', at_time: '', stop_note: '',
+})
+
+/**
+ * What the nth written time means. Nothing is inferred from a row's position in
+ * the grid - only from how many times were written above it - so inserting a coil
+ * or leaving rows blank cannot change what an existing time says.
+ */
+const timeRole = (writtenBefore: number) => (writtenBefore % 2 === 0 ? 'start' : 'stop')
 
 async function loadEntries(logId: number) {
   const { data, error } = await supabase
@@ -131,6 +148,9 @@ export function CoilEntryGrid({
     power_cuts: '0', remarks: '',
   })
   const [rows, setRows] = useState<CoilRow[]>(Array.from({ length: 10 }, blankRow))
+  // Off unless asked for: the plain grid is a transcription of the sheet, and
+  // pasting a register into it must keep working.
+  const [detailed, setDetailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
@@ -186,7 +206,11 @@ export function CoilEntryGrid({
       // tolerate a leading serial number like "1)" or "1."
       const nums = c.map((x) => x.replace(/[^0-9.]/g, '')).filter((x) => x !== '')
       const take = nums.length >= 5 ? nums.slice(1, 5) : nums.slice(0, 4)
-      return { gi_weight: take[0] ?? '', gi_size: take[1] ?? '', pvc_weight: take[2] ?? '', pvc_size: take[3] ?? '' }
+      return {
+        gi_weight: take[0] ?? '', gi_size: take[1] ?? '',
+        pvc_weight: take[2] ?? '', pvc_size: take[3] ?? '',
+        at_time: '', stop_note: '',
+      }
     })
     setRows((prev) => {
       const next = [...prev]
@@ -221,6 +245,8 @@ export function CoilEntryGrid({
         gi_size: r.gi_size ? Number(r.gi_size) : null,
         pvc_weight: Number(r.pvc_weight),
         pvc_size: r.pvc_size ? Number(r.pvc_size) : null,
+        at_time: r.at_time || null,
+        stop_note: r.stop_note || null,
       })),
       p_log_date: logDate,
       p_shift: head.shift,
@@ -293,6 +319,13 @@ export function CoilEntryGrid({
             )}
           </Field>
         )}
+        {head.shift === 'G' && !detailed && (
+          <div className="flex items-end">
+            <Button type="button" variant="ghost" onClick={() => setDetailed(true)}>
+              Add more details
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Stated, not offered. The size comes off the article; a box here would
@@ -342,13 +375,17 @@ export function CoilEntryGrid({
                 <th className="pb-1 text-right font-medium">Base size</th>
                 <th className="pb-1 text-right font-medium">Coated (kg)</th>
                 <th className="pb-1 text-right font-medium">Coated size</th>
+                {detailed && <th className="pb-1 pl-2 text-left font-medium">Time</th>}
                 <th className="pb-1 pl-2 text-left font-medium">Check</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r, i) => {
                 const flags = rowFlags(r)
-                return (
+                const writtenBefore = rows.slice(0, i).filter((x) => x.at_time).length
+                const role = timeRole(writtenBefore)
+                const isStop = !!r.at_time && role === 'stop'
+                const coilRow = (
                   <tr key={i}>
                     <td className="py-0.5 text-xs text-slate-400">{i + 1}</td>
                     <td className="py-0.5 pr-1">
@@ -367,11 +404,43 @@ export function CoilEntryGrid({
                       <input inputMode="decimal" value={r.pvc_size}
                         onChange={(e) => setRow(i, { pvc_size: e.target.value })} className={cell} />
                     </td>
+                    {detailed && (
+                      <td className="py-0.5 pl-2">
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="time" value={r.at_time}
+                            onChange={(e) => setRow(i, { at_time: e.target.value })}
+                            className="rounded border border-slate-300 px-1 py-1 text-xs tabular-nums"
+                          />
+                          {r.at_time && (
+                            <span className={'text-xs font-medium ' + (role === 'stop' ? 'text-amber-700' : 'text-green-700')}>
+                              {role}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    )}
                     <td className="py-0.5 pl-2 text-xs whitespace-nowrap text-amber-700">
                       {flags.join(' · ')}
                     </td>
                   </tr>
                 )
+                // The reason sits under the coil the machine stopped at. Stored on
+                // that coil rather than as a row of its own, so no total has to
+                // learn to skip a row that carries no weights.
+                return [coilRow, isStop ? (
+                  <tr key={i + '-stop'}>
+                    <td />
+                    <td colSpan={detailed ? 6 : 5} className="pt-0.5 pb-1.5">
+                      <input
+                        value={r.stop_note}
+                        onChange={(e) => setRow(i, { stop_note: e.target.value })}
+                        placeholder={'Why did it stop at ' + fmtTime(r.at_time) + '?'}
+                        className="w-full rounded border border-amber-300 bg-amber-50/60 px-2 py-1 text-xs"
+                      />
+                    </td>
+                  </tr>
+                ) : null]
               })}
             </tbody>
           </table>
