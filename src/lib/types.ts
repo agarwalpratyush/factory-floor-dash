@@ -73,6 +73,11 @@ export interface StockLevel {
   pack_unit: string
   /** Mesh and mesh products, which are sold by area as well as by weight. */
   sold_by_area: boolean
+  /** The size this article is made to: the wire inside, and the outside diameter
+   *  once coated. Held on the article so every shift is checked against the same
+   *  target, rather than against whatever was typed that morning. */
+  core_mm: number | null
+  od_mm: number | null
   role: StockRole
   /** May go out to a customer. Always true for a finished article, which since
    *  work in progress was dropped is everything that is made here. */

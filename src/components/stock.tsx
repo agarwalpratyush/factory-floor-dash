@@ -31,6 +31,10 @@ export const ROLE_HINT: Record<StockRole, string> = {
 /** Quoted by the square metre as well as by weight: everything woven. */
 const AREA_CATEGORIES = ['Gabion Box', 'Rolls', 'Mattress']
 
+/** Drawn to a diameter, so a size means something. A gabion box has dimensions
+ *  but not a gauge, which is a different question and not this one. */
+const WIRE_CATEGORIES = ['Base Wire', 'GI Wire', 'Polymer Coated GI Wire']
+
 export function AddMaterialForm({
   plantId, role, categories, onDone,
 }: {
@@ -53,6 +57,7 @@ export function AddMaterialForm({
     code: '', name: '', category: categories[0] ?? '',
     sold_by_area: false,
     opening_stock: '', opening_packs: '', reorder_level: '',
+    core_mm: '', od_mm: '',
   })
   // Opening stock is typed in whichever unit the person has it in, like a purchase.
   // Where it lands is not a choice: every new article is kept in MT.
@@ -85,6 +90,10 @@ export function AddMaterialForm({
         name: f.name.trim(),
         category: f.category,
         unit: STOCK_UNIT,
+        // The size it is made to belongs to the article, so every shift is checked
+        // against the same target rather than one typed that morning.
+        core_mm: f.core_mm ? Number(f.core_mm) : null,
+        od_mm: f.od_mm ? Number(f.od_mm) : null,
         sold_by_area: f.sold_by_area,
       })
       .select('id')
@@ -170,6 +179,26 @@ export function AddMaterialForm({
             </select>
           </div>
         </Field>
+        {WIRE_CATEGORIES.includes(f.category) && (
+          <Field label="Base wire size (mm)">
+            <input
+              type="number" step="0.001" min="0"
+              value={f.core_mm} onChange={(e) => setF({ ...f, core_mm: e.target.value })}
+              className={inputCls}
+              placeholder="the wire inside"
+            />
+          </Field>
+        )}
+        {f.category === 'Polymer Coated GI Wire' && (
+          <Field label="Coated size (mm)">
+            <input
+              type="number" step="0.001" min="0"
+              value={f.od_mm} onChange={(e) => setF({ ...f, od_mm: e.target.value })}
+              className={inputCls}
+              placeholder="outside diameter"
+            />
+          </Field>
+        )}
         {role === 'raw' && (
           <Field label="Reorder at">
             <div className="flex gap-2">

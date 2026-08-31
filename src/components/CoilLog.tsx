@@ -123,6 +123,17 @@ export function CoilEntryGrid({
   const [err, setErr] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
 
+  /** Picking what is being made fills in what it is made to. */
+  function pickProduct(id: string) {
+    const made = stock.find((s) => String(s.material_id) === id)
+    setHead((prev) => ({
+      ...prev,
+      pvc_material_id: id,
+      nominal_size_mm: made?.core_mm != null ? String(made.core_mm) : prev.nominal_size_mm,
+      target_pvc_size_mm: made?.od_mm != null ? String(made.od_mm) : prev.target_pvc_size_mm,
+    }))
+  }
+
   const giOpts = stock.filter((s) => s.role === 'raw' && s.category === 'Base Wire')
   const granOpts = stock.filter((s) => s.role === 'raw' && s.category === 'Polymer')
   const pvcOpts = stock.filter((s) => s.role === 'finished' && s.category === 'Polymer Coated GI Wire')
@@ -215,19 +226,11 @@ export function CoilEntryGrid({
   return (
     <form onSubmit={submit} className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Date">
-          <input type="date" value={head.log_date} onChange={(e) => setHead({ ...head, log_date: e.target.value })} className={inputCls} />
-        </Field>
-        <Field label="Shift">
-          <select value={head.shift} onChange={(e) => setHead({ ...head, shift: e.target.value })} className={inputCls}>
-            {SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+        <Field label="Finished Product *">
+          <select required value={head.pvc_material_id} onChange={(e) => pickProduct(e.target.value)} className={inputCls}>
+            <option value="">Select…</option>
+            {pvcOpts.map((s) => <option key={s.material_id} value={s.material_id}>{s.code} — {s.name}</option>)}
           </select>
-        </Field>
-        <Field label="As written on the sheet">
-          <input value={head.shift_label} onChange={(e) => setHead({ ...head, shift_label: e.target.value })} className={inputCls} placeholder="7 AM" />
-        </Field>
-        <Field label="Size (mm)">
-          <input type="number" step="0.001" value={head.nominal_size_mm} onChange={(e) => setHead({ ...head, nominal_size_mm: e.target.value })} className={inputCls} />
         </Field>
         <Field label="Base Wire Used *">
           <select required value={head.gi_material_id} onChange={(e) => setHead({ ...head, gi_material_id: e.target.value })} className={inputCls}>
@@ -241,14 +244,24 @@ export function CoilEntryGrid({
             {granOpts.map((s) => <option key={s.material_id} value={s.material_id}>{s.code} — {s.name}</option>)}
           </select>
         </Field>
-        <Field label="Coated wire produced *">
-          <select required value={head.pvc_material_id} onChange={(e) => setHead({ ...head, pvc_material_id: e.target.value })} className={inputCls}>
-            <option value="">Select…</option>
-            {pvcOpts.map((s) => <option key={s.material_id} value={s.material_id}>{s.code} — {s.name}</option>)}
+        <Field label="Base wire size (mm)">
+          <input type="number" step="0.001" value={head.nominal_size_mm} onChange={(e) => setHead({ ...head, nominal_size_mm: e.target.value })} className={inputCls} />
+          <p className="mt-1 text-xs text-slate-500">± 0.10 tolerance</p>
+        </Field>
+        <Field label="Coated size (mm)">
+          <input type="number" step="0.001" value={head.target_pvc_size_mm} onChange={(e) => setHead({ ...head, target_pvc_size_mm: e.target.value })} className={inputCls} />
+          <p className="mt-1 text-xs text-slate-500">± 0.05 tolerance</p>
+        </Field>
+        <Field label="Date">
+          <input type="date" value={head.log_date} onChange={(e) => setHead({ ...head, log_date: e.target.value })} className={inputCls} />
+        </Field>
+        <Field label="Shift">
+          <select value={head.shift} onChange={(e) => setHead({ ...head, shift: e.target.value })} className={inputCls}>
+            {SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </Field>
-        <Field label="Target PVC size (mm)">
-          <input type="number" step="0.001" value={head.target_pvc_size_mm} onChange={(e) => setHead({ ...head, target_pvc_size_mm: e.target.value })} className={inputCls} />
+        <Field label="As written on the sheet">
+          <input value={head.shift_label} onChange={(e) => setHead({ ...head, shift_label: e.target.value })} className={inputCls} placeholder="7 AM" />
         </Field>
       </div>
 

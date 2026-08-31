@@ -285,6 +285,15 @@ Two things fall out of it that the paper cannot give you:
   rather than a process event. Transcribe what the register says and let the system
   flag it; never silently correct the source document.
 
+**A product's size belongs to the product.** `ff_materials.core_mm` and `od_mm`
+hold what an article is made to; choosing the Finished Product on a coil log fills
+both in, and the form states the tolerances beside them — 0.10 mm on the wire,
+0.05 mm on the coated diameter, which is what decides whether a coil turns amber.
+They remain editable per shift: a run can aim slightly off, and the article should
+not be rewritten from the shop floor to say so. What is fixed is that two shifts of
+the same article are no longer checked against whatever each typed that morning.
+Set them on Finished Stock, where the article lives.
+
 The coil form asks in the floor's words — **Base Wire Used**, **Polymer Used**,
 then **Coated wire produced**, inputs before output. Its three dropdowns are filtered
 on category and role, not on how a code happens to start: the old `code.startsWith`
