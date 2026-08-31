@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useQuery } from '../lib/useQuery'
 import { Button, ErrorBox, Field, inputCls, Spinner } from '../components/ui'
-import { fmtNum, fmtTime } from '../lib/format'
+import { fmtNum } from '../lib/format'
 import { POWER_CUT, PRODUCTION_SHIFTS, STOP_REASONS } from '../lib/types'
 import type { StockLevel } from '../lib/types'
 
@@ -416,9 +416,6 @@ export function CoilEntryGrid({
                     <td />
                     <td colSpan={detailedShift ? 6 : 5} className="pt-0.5 pb-1.5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs text-amber-800">
-                          Stopped at {fmtTime(r.at_time)}
-                        </span>
                         <select
                           value={r.stop_reason}
                           onChange={(e) => setRow(i, { stop_reason: e.target.value })}
