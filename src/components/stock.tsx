@@ -123,11 +123,6 @@ export function AddMaterialForm({
                 {MATERIAL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
-            <Field label="Counted in">
-              <div className={inputCls + ' bg-slate-50 text-slate-600'}>
-                {PACK_BY_CATEGORY[f.category] ?? 'piece'}s
-              </div>
-            </Field>
         <Field label="What is it here? *">
           <select value={role} onChange={(e) => setRole(e.target.value as StockRole)} className={inputCls}>
             {allowedRoles.includes('raw') && <option value="raw">Raw material — bought in, consumed here</option>}

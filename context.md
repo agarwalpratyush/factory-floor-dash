@@ -66,8 +66,9 @@ kept in it. kg is not an alternative, only a smaller way of saying the same thin
 which is a question for how a number is typed and read — never for how it is held.
 And what an article is counted in follows from what it is: wire in coils, polymer in
 bags, product in pieces. That was a question with exactly one right answer, which is
-not a question, so `ff_sync_pack_unit()` derives `pack_unit` from `category` and the
-form states it rather than asking. **Adding a category means adding a case to that
+not a question, so `ff_sync_pack_unit()` derives `pack_unit` from `category`. The form
+does not show it either — the opening count is already labelled *Opening coils* or
+*Opening bags*, so a field repeating the word said nothing the form did not. **Adding a category means adding a case to that
 trigger** — the two are one decision.
 
 What remains: code, name, category, what it is here, the opening — **as both a
