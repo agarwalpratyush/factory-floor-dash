@@ -68,7 +68,7 @@ export default function Stock() {
         <Card title={'Add a finished article to ' + plant.short_name}>
           <AddMaterialForm
             plantId={plant.id}
-            allowedRoles={['finished']}
+            role="finished"
             onDone={() => { setShowNew(false); refresh() }}
           />
         </Card>

@@ -295,7 +295,7 @@ export default function Materials() {
         <Card title={'Add an article to ' + plant.short_name}>
           <AddMaterialForm
             plantId={plant.id}
-            allowedRoles={HELD_HERE}
+            role="raw"
             onDone={() => { setShowNew(false); refresh() }}
           />
         </Card>

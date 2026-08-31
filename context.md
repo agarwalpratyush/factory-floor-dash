@@ -71,8 +71,13 @@ does not show it either — the opening count is already labelled *Opening coils
 *Opening bags*, so a field repeating the word said nothing the form did not. **Adding a category means adding a case to that
 trigger** — the two are one decision.
 
-What remains: code, name, category, what it is here, the opening — **as both a
-weight and a count** — the reorder level, and whether it can be sold. The weight is
+**Nor is what the article is here.** Raw Material creates `raw`, Finished Stock
+creates `finished`, and the page passes it rather than offering a list of one — with
+work in progress gone there is no second answer. Finished implies sellable, so that
+tick-box shows only on the raw side, where it means *resold as it stands*.
+
+What remains: code, name, category, the opening — **as both a weight and a count** —
+the reorder level on raw, and on raw whether it can be sold. The weight is
 typed in MT or kg and converted on save, like a purchase.
 
 **The opening is counted as well as weighed**, and `ff_material_plants.opening_packs`

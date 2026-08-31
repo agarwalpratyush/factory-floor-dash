@@ -29,15 +29,16 @@ export const ROLE_HINT: Record<StockRole, string> = {
  * that does not recur; a shared article is now a deliberate act, not a menu item.
  */
 export function AddMaterialForm({
-  plantId, allowedRoles, onDone,
+  plantId, role, onDone,
 }: {
   plantId: number
-  /** Which roles this page is allowed to create. Raw Material owns raw; Stock owns
-   *  finished. Offering both from either would let one article be filed twice. */
-  allowedRoles: StockRole[]
+  /** What this page holds. Raw Material creates raw, Finished Stock creates
+   *  finished, and neither offers the other - an article filed under both pages
+   *  would have two balances answering the same question. Passed rather than
+   *  asked, because with work in progress gone there is only ever one answer. */
+  role: StockRole
   onDone: () => void
 }) {
-  const [role, setRole] = useState<StockRole>(allowedRoles[0])
   // A finished article is sellable by definition; anything else opts in. The
   // database enforces the first half, so this only has to offer the second.
   const [sellable, setSellable] = useState(false)
@@ -121,12 +122,6 @@ export function AddMaterialForm({
                 {MATERIAL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
-        <Field label="What is it here? *">
-          <select value={role} onChange={(e) => setRole(e.target.value as StockRole)} className={inputCls}>
-            {allowedRoles.includes('raw') && <option value="raw">Raw material — bought in, consumed here</option>}
-            {allowedRoles.includes('finished') && <option value="finished">Finished goods — made here, sold out</option>}
-          </select>
-        </Field>
         <Field label={'Opening ' + (PACK_BY_CATEGORY[f.category] ?? 'piece') + 's *'}>
           <input
             required
@@ -189,21 +184,18 @@ export function AddMaterialForm({
         </label>
       )}
 
-      <label className="flex items-center gap-2 text-sm text-slate-700">
-        <input
-          type="checkbox"
-          checked={role === 'finished' ? true : sellable}
-          disabled={role === 'finished'}
-          onChange={(e) => setSellable(e.target.checked)}
-          className="h-4 w-4 rounded"
-        />
-        Can be sold to a customer
-        <span className="text-xs text-slate-500">
-          {role === 'finished'
-            ? '— always, for a finished article'
-            : '— tick for something half-made that is also sold as it stands, like a mesh roll'}
-        </span>
-      </label>
+      {role !== 'finished' && (
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={sellable}
+            onChange={(e) => setSellable(e.target.checked)}
+            className="h-4 w-4 rounded"
+          />
+          Can be sold to a customer
+          <span className="text-xs text-slate-500">— tick if this is resold as it stands</span>
+        </label>
+      )}
       {err && <p className="text-sm text-red-600">{err}</p>}
       <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Add to this company'}</Button>
     </form>
