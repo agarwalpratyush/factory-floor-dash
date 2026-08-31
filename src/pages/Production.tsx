@@ -201,6 +201,8 @@ export default function Production() {
   const { can } = useAuth()
   const [days, setDays] = useState(30)
   const [showNew, setShowNew] = useState(false)
+  // The shift's date belongs beside Cancel, so the page holds it.
+  const [logDate, setLogDate] = useState(today())
   const [openId, setOpenId] = useState<number | null>(null)
   const { data, loading, error, refresh } = useQuery(
     () => loadPage(scope, daysAgo(days)),
@@ -250,17 +252,28 @@ export default function Production() {
           <h1 className="text-xl font-semibold text-slate-900">Production</h1>
           <p className="text-sm text-slate-500">{subtitle}</p>
         </div>
-        {canEnter && (
-          <Button variant={showNew ? 'ghost' : 'primary'} onClick={() => setShowNew((s) => !s)}>
-            {showNew ? 'Cancel' : coating ? '+ Record shift' : '+ Record run'}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {showNew && coating && (
+            <input
+              required
+              type="date" value={logDate} max={today()}
+              onChange={(e) => setLogDate(e.target.value)}
+              className={inputCls + ' w-auto' + (logDate ? '' : ' !border-red-500 bg-red-50')}
+              title="The date this shift ran"
+            />
+          )}
+          {canEnter && (
+            <Button variant={showNew ? 'ghost' : 'primary'} onClick={() => setShowNew((s) => !s)}>
+              {showNew ? 'Cancel' : coating ? '+ Record shift' : '+ Record run'}
+            </Button>
+          )}
+        </div>
       </header>
 
       {showNew && plant && data && (
         <Card title={(coating ? 'Coating shift · ' : 'Production run · ') + plant.short_name}>
           {coating ? (
-            <CoilEntryGrid plantId={plant.id} stock={data.stock} onDone={refresh} />
+            <CoilEntryGrid plantId={plant.id} stock={data.stock} logDate={logDate} onDone={refresh} />
           ) : (
             <RunForm plantId={plant.id} stock={data.stock} orders={data.orders} onDone={refresh} />
           )}

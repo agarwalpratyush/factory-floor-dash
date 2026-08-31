@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useQuery } from '../lib/useQuery'
 import { Button, ErrorBox, Field, inputCls, Spinner } from '../components/ui'
-import { fmtNum, today } from '../lib/format'
+import { fmtNum, fmtTime, spanHours } from '../lib/format'
 import { PRODUCTION_SHIFTS } from '../lib/types'
 import type { StockLevel } from '../lib/types'
 
@@ -73,10 +73,10 @@ export function CoilDetail({ log }: { log: CoilLogSummary }) {
         <thead>
           <tr className="text-left text-xs tracking-wide text-slate-500 uppercase">
             <th className="pb-2 font-medium">#</th>
-            <th className="pb-2 text-right font-medium">GI wt (kg)</th>
-            <th className="pb-2 text-right font-medium">GI size</th>
-            <th className="pb-2 text-right font-medium">PVC wt (kg)</th>
-            <th className="pb-2 text-right font-medium">PVC size</th>
+            <th className="pb-2 text-right font-medium">Base wire (kg)</th>
+            <th className="pb-2 text-right font-medium">Base size</th>
+            <th className="pb-2 text-right font-medium">Coated (kg)</th>
+            <th className="pb-2 text-right font-medium">Coated size</th>
             <th className="pb-2 text-right font-medium">Pickup</th>
           </tr>
         </thead>
@@ -114,15 +114,19 @@ export function CoilDetail({ log }: { log: CoilLogSummary }) {
 }
 
 export function CoilEntryGrid({
-  plantId, stock, onDone,
+  plantId, stock, logDate, onDone,
 }: {
   plantId: number
   stock: StockLevel[]
+  /** Held by the page so it can sit beside Cancel: the shift's date is a header
+   *  fact, not one of the things being chosen on the form. */
+  logDate: string
   onDone: () => void
 }) {
   const [head, setHead] = useState({
-    log_date: today(), shift: 'A',
+    shift: 'A',
     nominal_size_mm: '2.600', target_pvc_size_mm: '3.600',
+    started_at: '', stopped_at: '',
     gi_material_id: '', pvc_material_id: '', granule_material_id: '',
     power_cuts: '0', remarks: '',
   })
@@ -166,9 +170,9 @@ export function CoilEntryGrid({
       if (pvc <= gi) out.push('coated weight not above GI')
     }
     if (r.gi_size && head.nominal_size_mm
-      && Math.abs(Number(r.gi_size) - Number(head.nominal_size_mm)) > GI_TOLERANCE) out.push('GI dia')
+      && Math.abs(Number(r.gi_size) - Number(head.nominal_size_mm)) > GI_TOLERANCE) out.push('base dia')
     if (r.pvc_size && head.target_pvc_size_mm
-      && Math.abs(Number(r.pvc_size) - Number(head.target_pvc_size_mm)) > PVC_TOLERANCE) out.push('PVC dia')
+      && Math.abs(Number(r.pvc_size) - Number(head.target_pvc_size_mm)) > PVC_TOLERANCE) out.push('coated dia')
     return out
   }
 
@@ -196,6 +200,9 @@ export function CoilEntryGrid({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
+    // The date lives in the page header, outside this form, so the browser will
+    // not check it for us - a shift with no date is not a shift.
+    if (!logDate) { setErr('Set the shift date, beside Cancel above.'); return }
     if (filled.length === 0) { setErr('Enter at least one coil.'); return }
     if (granules <= 0) { setErr('Total coated weight must exceed total base wire weight — check the figures.'); return }
 
@@ -215,9 +222,12 @@ export function CoilEntryGrid({
         pvc_weight: Number(r.pvc_weight),
         pvc_size: r.pvc_size ? Number(r.pvc_size) : null,
       })),
-      p_log_date: head.log_date,
+      p_log_date: logDate,
       p_shift: head.shift,
       p_shift_label: null,
+      // Only a custom shift carries them; Day and Night say their own hours.
+      p_started_at: head.shift === 'G' && head.started_at ? head.started_at : null,
+      p_stopped_at: head.shift === 'G' && head.stopped_at ? head.stopped_at : null,
       p_target_pvc_size_mm: Number(head.target_pvc_size_mm),
       p_power_cuts: Number(head.power_cuts) || 0,
       p_remarks: head.remarks.trim() || null,
@@ -235,20 +245,6 @@ export function CoilEntryGrid({
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      {/* Which day this shift was is a header fact, not one of the things being
-          chosen, so it sits at the top right rather than in the run of fields. */}
-      <div className="flex items-center justify-end gap-2">
-        <label className="text-xs tracking-wide text-slate-500 uppercase" htmlFor="coil-log-date">
-          Shift date
-        </label>
-        <input
-          id="coil-log-date"
-          type="date" value={head.log_date} max={today()}
-          onChange={(e) => setHead({ ...head, log_date: e.target.value })}
-          className={inputCls + ' w-auto'}
-        />
-      </div>
-
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Field label="Finished Product *">
           <select required value={head.pvc_material_id} onChange={(e) => pickProduct(e.target.value)} className={inputCls}>
@@ -273,6 +269,30 @@ export function CoilEntryGrid({
             {PRODUCTION_SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </Field>
+        {head.shift === 'G' && (
+          <Field label="Machine started">
+            <input
+              type="time" value={head.started_at}
+              onChange={(e) => setHead({ ...head, started_at: e.target.value })}
+              className={inputCls}
+            />
+          </Field>
+        )}
+        {head.shift === 'G' && (
+          <Field label="Machine stopped">
+            <input
+              type="time" value={head.stopped_at}
+              onChange={(e) => setHead({ ...head, stopped_at: e.target.value })}
+              className={inputCls}
+            />
+            {head.started_at && head.stopped_at && (
+              <p className="mt-1 text-xs text-slate-500">
+                {fmtTime(head.started_at)} → {fmtTime(head.stopped_at)} ·{' '}
+                {fmtNum(spanHours(head.started_at, head.stopped_at) ?? 0, 1)}h
+              </p>
+            )}
+          </Field>
+        )}
       </div>
 
       {/* Stated, not offered. The size comes off the article; a box here would
@@ -319,9 +339,9 @@ export function CoilEntryGrid({
               <tr className="text-xs tracking-wide text-slate-500 uppercase">
                 <th className="w-8 pb-1 text-left font-medium">#</th>
                 <th className="pb-1 text-right font-medium">Base wire (kg)</th>
-                <th className="pb-1 text-right font-medium">GI size</th>
-                <th className="pb-1 text-right font-medium">PVC wire (kg)</th>
-                <th className="pb-1 text-right font-medium">PVC size</th>
+                <th className="pb-1 text-right font-medium">Base size</th>
+                <th className="pb-1 text-right font-medium">Coated (kg)</th>
+                <th className="pb-1 text-right font-medium">Coated size</th>
                 <th className="pb-1 pl-2 text-left font-medium">Check</th>
               </tr>
             </thead>

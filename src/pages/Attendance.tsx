@@ -7,7 +7,7 @@ import {
   Badge, Button, Card, Empty, ErrorBox, Field, inputCls,
   NeedPlant, PlantTag, Spinner, Stat,
 } from '../components/ui'
-import { daysAgo, fmtDate, fmtNum, fmtTime, relativeDay, today } from '../lib/format'
+import { daysAgo, fmtDate, fmtNum, fmtTime, relativeDay, spanHours, today } from '../lib/format'
 import {
   ALL_DEPTS, ATTENDANCE_LABEL, DEPTS_BY_PLANT, DEPT_GROUPING_MIN, DESIGNATIONS, SHIFTS,
 } from '../lib/types'
@@ -27,15 +27,6 @@ const OT_MULTIPLIER = 2
 /** Postgres hands back a time as HH:MM:SS; the input wants HH:MM. */
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : '')
 
-/** Hours between clocking in and clocking out. A night shift runs 20:00 to 08:00,
- *  so an out time at or before the in time is the next morning, not a negative day. */
-function spanHours(inT: string | null, outT: string | null): number | null {
-  if (!inT || !outT) return null
-  const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
-  let d = mins(outT) - mins(inT)
-  if (d <= 0) d += 24 * 60
-  return d / 60
-}
 
 const STATUS_BTN: Record<AttendanceStatus, string> = {
   present: 'bg-green-600 text-white ring-green-600',

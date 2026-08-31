@@ -285,6 +285,16 @@ Two things fall out of it that the paper cannot give you:
   rather than a process event. Transcribe what the register says and let the system
   flag it; never silently correct the source document.
 
+**A custom shift says when the machine ran.** `ff_coil_logs.started_at` and
+`stopped_at` are asked for only when the shift is `G`; Day and Night carry their
+hours in their names. The span wraps past midnight, from the same helper the
+attendance page uses.
+
+The shift date lives on the **page**, beside Cancel, not in the form — it is a
+header fact rather than one of the things being chosen. Being outside the `<form>`,
+`required` does nothing there, so the guard is explicit in `submit()`. Anything of
+that shape needs the same treatment.
+
 **`G` reads as *General* for a person and *Custom* for a shift log.** One stored
 value, two honest readings — somebody not on a rota, versus a run that sat in
 neither standard slot. `PRODUCTION_SHIFTS` relabels it for production only. Do not

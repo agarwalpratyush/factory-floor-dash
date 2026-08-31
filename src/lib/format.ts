@@ -41,6 +41,16 @@ export const isWeight = (unit: string | null | undefined) =>
 
 export const toKg = (qty: number, unit: string) => Number(qty) * (KG_PER[unit] ?? 1)
 
+/** Hours between clocking in and clocking out. A night shift runs 20:00 to 08:00,
+ *  so an out time at or before the in time is the next morning, not a negative day. */
+export function spanHours(inT: string | null, outT: string | null): number | null {
+  if (!inT || !outT) return null
+  const mins = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
+  let d = mins(outT) - mins(inT)
+  if (d <= 0) d += 24 * 60
+  return d / 60
+}
+
 /** Turns a weight typed in one unit into the unit the article is stored in. */
 export const toStored = (qty: number, typedIn: string, storedIn: string) =>
   toKg(qty, typedIn) / (KG_PER[storedIn] ?? 1)
