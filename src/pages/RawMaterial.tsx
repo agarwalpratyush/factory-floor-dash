@@ -9,7 +9,7 @@ import {
 } from '../components/ui'
 import { AddMaterialForm, ROLE_HINT, RoleTable } from '../components/stock'
 import { daysAgo, fmtDate, fmtNum, fmtQty, today } from '../lib/format'
-import { STOCK_ROLE_LABEL, TXN_TYPE_LABEL } from '../lib/types'
+import { MATERIAL_CATEGORIES, STOCK_ROLE_LABEL, TXN_TYPE_LABEL } from '../lib/types'
 import type { Direction, Material, MaterialTxn, Order, StockLevel, StockRole, TxnType } from '../lib/types'
 
 /**
@@ -282,9 +282,33 @@ export default function Materials() {
           {HELD_HERE.map((role) => {
             const inRole = held.filter((x) => x.role === role)
             if (inRole.length === 0) return null
+
+            // Grouped by what the article is made of, in the order the categories
+            // are listed, with anything uncategorised last rather than dropped.
+            const groups = [
+              ...MATERIAL_CATEGORIES.map((c) => [c, inRole.filter((x) => x.category === c)] as const),
+              ['Uncategorised', inRole.filter((x) => !MATERIAL_CATEGORIES.includes(x.category))] as const,
+            ].filter(([, rows]) => rows.length > 0)
+
             return (
               <Card key={role} title={STOCK_ROLE_LABEL[role]}>
                 <p className="-mt-1 mb-3 text-xs text-slate-500">{ROLE_HINT[role]}</p>
+                {role === 'raw' && groups.length > 1 ? groups.map(([cat, rows]) => (
+                  <div key={cat} className="mb-5 last:mb-0">
+                    <h3 className="mb-2 text-xs font-semibold tracking-wide text-slate-500 uppercase">
+                      {cat}
+                      <span className="ml-1 font-normal text-slate-400">({rows.length})</span>
+                    </h3>
+                    <RoleTable
+                      role={role}
+                      rows={rows}
+                      scope={scope}
+                      onEditReorder={saveReorder}
+                      editing={editing}
+                      setEditing={setEditing}
+                    />
+                  </div>
+                )) : (
                 <RoleTable
                   role={role}
                   rows={inRole}
@@ -293,6 +317,7 @@ export default function Materials() {
                   editing={editing}
                   setEditing={setEditing}
                 />
+                )}
                 {role === 'raw' && (
                   <p className="mt-3 text-xs text-slate-500">Click a reorder level to change it for that company.</p>
                 )}

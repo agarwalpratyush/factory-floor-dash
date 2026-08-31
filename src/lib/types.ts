@@ -378,6 +378,14 @@ export const ALL_DEPTS = [
  *  codes are unchanged - 'A' has always been the day shift - so rows written under
  *  the old eight hour labels still mean what they say. 'C' is gone; it was never
  *  used. 'G' is for group staff, who are not on a shift at all. */
+/**
+ * What an article is made of, in the floor's words. Saffron buys base wire and
+ * polymer; Agarwal buys wire. This is global to the article and groups the raw
+ * material list - not to be confused with `role`, which is what the article does
+ * at one company.
+ */
+export const MATERIAL_CATEGORIES = ['Base Wire', 'Polymer', 'Packing', 'Product', 'Other']
+
 export const SHIFTS = [
   { value: 'A', label: 'Day (8 am – 8 pm)' },
   { value: 'B', label: 'Night (8 pm – 8 am)' },

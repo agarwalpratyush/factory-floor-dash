@@ -42,6 +42,17 @@ company's *finished product* and the fabrication company's *raw material*. So
 plant) pair, not on the material. `ff_materials.category` is only the article's
 general nature.
 
+**Category is what an article is made of; role is what it does here.** Two
+different questions, and both are needed. `ff_materials.category` is global and
+carries the floor's own words — **Base Wire**, **Polymer**, Packing, Product —
+because Saffron buys base wire and polymer and thinks of them apart, while Agarwal
+buys wire and needs no split. Grouping the raw list by category gives the right
+answer at both sites from one rule. `ff_material_plants.role` stays per company.
+
+The category was previously a seeded raw/consumable/packing taxonomy that nobody
+here uses, and the add-article form never showed the field at all — so every
+article added by hand was silently filed as `raw`. The form asks now.
+
 **What an article IS and whether it may be SOLD are separate facts.** A DT mesh
 roll is made to go into a gabion box *and* sold as it stands; one `role` per
 (material, plant) could not say both, and the effect was that no mesh roll could be

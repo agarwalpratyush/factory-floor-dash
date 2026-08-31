@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { type PlantScope } from '../lib/plant'
 import { Button, Empty, Field, inputCls, PlantTag } from './ui'
 import { fmtDate, fmtQty } from '../lib/format'
+import { MATERIAL_CATEGORIES } from '../lib/types'
 import type { Material, StockLevel, StockRole } from '../lib/types'
 
 /**
@@ -38,7 +39,7 @@ export function AddMaterialForm({
   const [sellable, setSellable] = useState(false)
   const [pick, setPick] = useState({ material_id: '', opening_stock: '', reorder_level: '' })
   const [f, setF] = useState({
-    code: '', name: '', category: 'raw', unit: 'kg', opening_stock: '', reorder_level: '',
+    code: '', name: '', category: MATERIAL_CATEGORIES[0], unit: 'kg', opening_stock: '', reorder_level: '',
   })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -116,6 +117,11 @@ export function AddMaterialForm({
             <Field label="Unit">
               <select value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} className={inputCls}>
                 {['kg', 'MT', 'nos', 'm', 'roll', 'coil'].map((u) => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </Field>
+            <Field label="Category">
+              <select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} className={inputCls}>
+                {MATERIAL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
           </>
