@@ -411,12 +411,16 @@ export const ALL_DEPTS = [
 export const MATERIAL_CATEGORIES = ['Base Wire', 'Polymer', 'Product']
 
 /**
- * What an article's balance is kept in. MT leads because weight is the standard;
- * `coil` is deliberately absent - a coil is a count taken alongside the weight,
- * not a unit a balance is held in, and holding stock in coils would mean a
- * balance nobody can weigh.
+ * Every balance is a weight, so there is nothing to choose: a new article is kept
+ * in MT. kg is not an alternative to it, only a smaller way of saying the same
+ * thing, which is a question for how a number is typed and shown - never for how
+ * it is held. Pieces, coils and bags are the count beside the weight.
+ *
+ * Articles created before this rule are still kept in `kg`, `nos` or `roll`. They
+ * keep working: a balance still means what it always meant, and `fmtWeight` reads
+ * each one in its own terms.
  */
-export const STOCK_UNITS = ['MT', 'kg', 'nos', 'roll', 'm']
+export const STOCK_UNIT = 'MT'
 
 /** The floor's word for one pack. Counted alongside the weight, never converted. */
 export const PACK_UNITS = ['coil', 'bag', 'piece']

@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { type PlantScope } from '../lib/plant'
 import { Button, Empty, Field, inputCls, PlantTag } from './ui'
-import { fmtDate, fmtQty, fmtWeight, isWeight, toStored } from '../lib/format'
-import { MATERIAL_CATEGORIES, PACK_BY_CATEGORY, PACK_UNITS, STOCK_UNITS } from '../lib/types'
+import { fmtDate, fmtQty, fmtWeight, toStored } from '../lib/format'
+import { MATERIAL_CATEGORIES, PACK_BY_CATEGORY, STOCK_UNIT } from '../lib/types'
 import type { StockLevel, StockRole } from '../lib/types'
 
 /**
@@ -45,22 +45,20 @@ export function AddMaterialForm({
   const [sellable, setSellable] = useState(false)
   const [f, setF] = useState({
     // MT is the standard, so it is what a new article starts on.
-    code: '', name: '', category: MATERIAL_CATEGORIES[0], unit: 'MT',
-    pack_unit: PACK_BY_CATEGORY[MATERIAL_CATEGORIES[0]] ?? '',
+    code: '', name: '', category: MATERIAL_CATEGORIES[0],
     sold_by_area: false,
     opening_stock: '', reorder_level: '',
   })
   // Opening stock is typed in whichever unit the person has it in, like a purchase.
+  // Where it lands is not a choice: every new article is kept in MT.
   const [openingUnit, setOpeningUnit] = useState<'MT' | 'kg'>('MT')
-  const weighed = isWeight(f.unit)
 
-  /** Choosing a category sets the pack word to the usual one for it, without
-   *  locking it: the floor's word is a default, not a rule. */
+  /** The category is the only choice here: it decides what the article is counted
+   *  in, and whether it is measured by area. A trigger sets the pack word from it. */
   function setCategory(category: string) {
     setF((prev) => ({
       ...prev,
       category,
-      pack_unit: PACK_BY_CATEGORY[category] ?? '',
       sold_by_area: category === 'Product' ? prev.sold_by_area : false,
     }))
   }
@@ -78,8 +76,7 @@ export function AddMaterialForm({
         code: f.code.trim().toUpperCase(),
         name: f.name.trim(),
         category: f.category,
-        unit: f.unit,
-        pack_unit: f.pack_unit,
+        unit: STOCK_UNIT,
         sold_by_area: f.sold_by_area,
       })
       .select('id')
@@ -100,12 +97,10 @@ export function AddMaterialForm({
       plant_id: plantId,
       role,
       sellable: role === 'finished' ? true : sellable,
-      opening_stock: src.opening_stock
-        ? (weighed ? toStored(Number(src.opening_stock), openingUnit, f.unit) : Number(src.opening_stock))
-        : 0,
+      opening_stock: src.opening_stock ? toStored(Number(src.opening_stock), openingUnit, STOCK_UNIT) : 0,
       // Only raw materials get reordered; the rest are produced to demand.
       reorder_level: role === 'raw' && src.reorder_level
-        ? (weighed ? toStored(Number(src.reorder_level), openingUnit, f.unit) : Number(src.reorder_level))
+        ? toStored(Number(src.reorder_level), openingUnit, STOCK_UNIT)
         : 0,
     })
     setBusy(false)
@@ -122,20 +117,15 @@ export function AddMaterialForm({
             <Field label="Name *">
               <input required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={inputCls} placeholder="GI Wire Roll 4.00 mm" />
             </Field>
-            <Field label="Kept in">
-              <select value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} className={inputCls}>
-                {STOCK_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-              </select>
-            </Field>
             <Field label="Category">
               <select value={f.category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
                 {MATERIAL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
-            <Field label="Counted in *">
-              <select required value={f.pack_unit} onChange={(e) => setF({ ...f, pack_unit: e.target.value })} className={inputCls}>
-                {PACK_UNITS.map((u) => <option key={u} value={u}>{u}s</option>)}
-              </select>
+            <Field label="Counted in">
+              <div className={inputCls + ' bg-slate-50 text-slate-600'}>
+                {PACK_BY_CATEGORY[f.category] ?? 'piece'}s
+              </div>
             </Field>
         <Field label="What is it here? *">
           <select value={role} onChange={(e) => setRole(e.target.value as StockRole)} className={inputCls}>
@@ -152,18 +142,15 @@ export function AddMaterialForm({
               onChange={(e) => setF({ ...f, opening_stock: e.target.value })}
               className={inputCls}
             />
-            {weighed ? (
-              <select
-                value={openingUnit}
-                onChange={(e) => setOpeningUnit(e.target.value as 'MT' | 'kg')}
-                className="rounded-lg border border-slate-300 px-2 text-sm"
-              >
-                <option value="MT">MT</option>
-                <option value="kg">kg</option>
-              </select>
-            ) : (
-              <span className="flex items-center px-2 text-sm text-slate-500">{f.unit}</span>
-            )}
+            <select
+              value={openingUnit}
+              onChange={(e) => setOpeningUnit(e.target.value as 'MT' | 'kg')}
+              className="rounded-lg border border-slate-300 px-2 text-sm"
+              title="How you are typing it. It is kept in MT either way."
+            >
+              <option value="MT">MT</option>
+              <option value="kg">kg</option>
+            </select>
           </div>
         </Field>
         {role === 'raw' && (
@@ -178,7 +165,11 @@ export function AddMaterialForm({
         )}
       </div>
 
-      <p className="text-xs text-slate-500">{ROLE_HINT[role]}</p>
+      <p className="text-xs text-slate-500">
+        {ROLE_HINT[role]} A balance is always a weight — how many
+        {' ' + (PACK_BY_CATEGORY[f.category] ?? 'piece')}s it came in is the count beside
+        it, not a second way of holding the same stock.
+      </p>
 
       {f.category === 'Product' && (
         <label className="flex items-center gap-2 text-sm text-slate-700">

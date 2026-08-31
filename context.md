@@ -60,13 +60,23 @@ so storing it in MT would round 267.810 kg to 268. `fmtWeight` in
 `src/lib/format.ts` is the only place that decides how a weight reads, and
 `toStored` converts what was typed into what the article is kept in.
 
-Adding an article asks all of it: what the balance is **kept in** (MT first, since
-weight is the standard), what it is **counted in** (the pack word, defaulted from the
-category and overridable), and whether it is **measured in square metres**. Opening
-stock and the reorder level are typed in MT or kg like a purchase and converted to
-the article's own unit on save. `coil` is deliberately not a stock unit — a balance
-held in coils is a balance nobody can weigh; a coil is a count taken beside the
-weight.
+**Adding an article asks only what is actually a choice.** A balance is always a
+weight, so there is no unit to pick: `STOCK_UNIT` is `MT` and every new article is
+kept in it. kg is not an alternative, only a smaller way of saying the same thing,
+which is a question for how a number is typed and read — never for how it is held.
+And what an article is counted in follows from what it is: wire in coils, polymer in
+bags, product in pieces. That was a question with exactly one right answer, which is
+not a question, so `ff_sync_pack_unit()` derives `pack_unit` from `category` and the
+form states it rather than asking. **Adding a category means adding a case to that
+trigger** — the two are one decision.
+
+What remains: code, name, category, what it is here, opening stock, reorder level,
+whether it can be sold. Opening stock and the reorder level are typed in MT or kg
+and converted on save, like a purchase.
+
+Articles created before this are still kept in `kg`, `nos` or `roll` and keep
+working — a balance means what it always meant, and `fmtWeight` reads each in its own
+terms. Only new ones are held to the rule.
 
 **Counting is compulsory both ways; the other measures are not.** However an
 article is weighed, whoever books it in or sends it out says how many coils, bags
