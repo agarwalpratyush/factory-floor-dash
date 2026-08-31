@@ -77,6 +77,9 @@ export interface StockLevel {
   reorder_level: number
   active: boolean
   opening_stock: number
+  /** The count at the opening, alongside the weight. Nothing derives one from
+   *  the other, so both are asked for. */
+  opening_packs: number | null
   balance: number
   total_in: number
   total_out: number

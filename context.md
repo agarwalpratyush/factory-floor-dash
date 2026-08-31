@@ -70,9 +70,15 @@ not a question, so `ff_sync_pack_unit()` derives `pack_unit` from `category` and
 form states it rather than asking. **Adding a category means adding a case to that
 trigger** — the two are one decision.
 
-What remains: code, name, category, what it is here, opening stock, reorder level,
-whether it can be sold. Opening stock and the reorder level are typed in MT or kg
-and converted on save, like a purchase.
+What remains: code, name, category, what it is here, the opening — **as both a
+weight and a count** — the reorder level, and whether it can be sold. The weight is
+typed in MT or kg and converted on save, like a purchase.
+
+**The opening is counted as well as weighed**, and `ff_material_plants.opening_packs`
+is where it goes. Without it the pack balance would start from nothing while the
+weight started from the opening figure, and the two would describe different piles
+from the first day. `packs_balance` runs from its own opening exactly as `balance`
+does. Nothing derives one from the other; both are asked for.
 
 Articles created before this are still kept in `kg`, `nos` or `roll` and keep
 working — a balance means what it always meant, and `fmtWeight` reads each in its own

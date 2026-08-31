@@ -47,7 +47,7 @@ export function AddMaterialForm({
     // MT is the standard, so it is what a new article starts on.
     code: '', name: '', category: MATERIAL_CATEGORIES[0],
     sold_by_area: false,
-    opening_stock: '', reorder_level: '',
+    opening_stock: '', opening_packs: '', reorder_level: '',
   })
   // Opening stock is typed in whichever unit the person has it in, like a purchase.
   // Where it lands is not a choice: every new article is kept in MT.
@@ -98,6 +98,7 @@ export function AddMaterialForm({
       role,
       sellable: role === 'finished' ? true : sellable,
       opening_stock: src.opening_stock ? toStored(Number(src.opening_stock), openingUnit, STOCK_UNIT) : 0,
+      opening_packs: src.opening_packs ? Number(src.opening_packs) : 0,
       // Only raw materials get reordered; the rest are produced to demand.
       reorder_level: role === 'raw' && src.reorder_level
         ? toStored(Number(src.reorder_level), openingUnit, STOCK_UNIT)
@@ -133,6 +134,16 @@ export function AddMaterialForm({
             {allowedRoles.includes('wip') && <option value="wip">Work in progress — made here, consumed here</option>}
             {allowedRoles.includes('finished') && <option value="finished">Finished goods — made here, sold out</option>}
           </select>
+        </Field>
+        <Field label={'Opening ' + (PACK_BY_CATEGORY[f.category] ?? 'piece') + 's *'}>
+          <input
+            required
+            type="number" step="1" min="0"
+            value={f.opening_packs}
+            onChange={(e) => setF({ ...f, opening_packs: e.target.value })}
+            className={inputCls}
+            title="How many were on hand at the opening. Counted, like the weight."
+          />
         </Field>
         <Field label="Opening stock">
           <div className="flex gap-2">
@@ -260,7 +271,12 @@ export function RoleTable({
                   <div className="font-medium text-slate-900">{s.code}</div>
                   <div className="text-xs text-slate-500">{s.name}</div>
                 </td>
-                <td className="py-2 text-right tabular-nums text-slate-500">{fmtWeight(s.opening_stock, s.unit)}</td>
+                <td className="py-2 text-right tabular-nums text-slate-500">
+                  {fmtWeight(s.opening_stock, s.unit)}
+                  {s.opening_packs !== null && Number(s.opening_packs) > 0 && (
+                    <div className="text-xs text-slate-400">{fmtQty(s.opening_packs)} {s.pack_unit}s</div>
+                  )}
+                </td>
                 {isRaw ? (
                   <>
                     <td className="py-2 text-right tabular-nums text-green-700">
@@ -281,14 +297,14 @@ export function RoleTable({
                 )}
                 <td className={'py-2 text-right font-semibold tabular-nums ' + (neg ? 'text-red-600' : low ? 'text-amber-600' : 'text-slate-900')}>
                   {fmtWeight(s.balance, s.unit)}
-                  {(Number(s.packs_seen) > 0 || Number(s.sqm_seen) > 0 || s.sold_by_area) && (
+                  {(Number(s.packs_seen) > 0 || Number(s.opening_packs) > 0 || Number(s.sqm_seen) > 0 || s.sold_by_area) && (
                     <div className="text-xs font-normal text-slate-500">
-                      {Number(s.packs_seen) > 0 && (
+                      {(Number(s.packs_seen) > 0 || Number(s.opening_packs) > 0) && (
                         <span title={Number(s.packs_seen) + ' of ' + s.movements + ' movements counted'}>
                           {fmtQty(s.packs_balance)} {s.pack_unit}s
                         </span>
                       )}
-                      {Number(s.packs_seen) > 0 && (Number(s.sqm_seen) > 0 || s.sold_by_area) && ' · '}
+                      {(Number(s.packs_seen) > 0 || Number(s.opening_packs) > 0) && (Number(s.sqm_seen) > 0 || s.sold_by_area) && ' · '}
                       {Number(s.sqm_seen) > 0 ? (
                         <span title={Number(s.sqm_seen) + ' of ' + s.movements + ' movements measured'}>
                           {fmtQty(s.sqm_balance)} sqm
