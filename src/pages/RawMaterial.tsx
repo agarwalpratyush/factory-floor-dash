@@ -7,7 +7,7 @@ import {
   Badge, Button, Card, Empty, ErrorBox, Field, inputCls,
   NeedPlant, PlantTag, Spinner, Stat,
 } from '../components/ui'
-import { AddMaterialForm, ROLE_HINT, RoleTable } from '../components/stock'
+import { ArticleForm, ROLE_HINT, RoleTable } from '../components/stock'
 import { daysAgo, fmtDate, fmtNum, fmtQty, fmtWeight, isWeight, toStored, today } from '../lib/format'
 import { MATERIAL_CATEGORIES, STOCK_ROLE_LABEL, TXN_TYPE_LABEL, categoriesFor } from '../lib/types'
 import type { Direction, MaterialTxn, Order, StockLevel, StockRole, TxnType } from '../lib/types'
@@ -231,6 +231,7 @@ export default function Materials() {
   const [typeFilter, setTypeFilter] = useState<'all' | Direction>('all')
   const [showNew, setShowNew] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
+  const [editArticle, setEditArticle] = useState<StockLevel | null>(null)
   const [q, setQ] = useState('')
 
   const rows = useMemo(() => {
@@ -300,7 +301,7 @@ export default function Materials() {
 
       {showNew && plant && data && (
         <Card title={'Add an article to ' + plant.short_name}>
-          <AddMaterialForm
+          <ArticleForm
             plantId={plant.id}
             role="raw"
             categories={categoriesFor(plant.processes, 'raw')}
@@ -336,6 +337,19 @@ export default function Materials() {
         <NeedPlant what="record a purchase" />
       )}
 
+      {editArticle && (
+        <Card title={'Edit ' + editArticle.code}>
+          <ArticleForm
+            key={editArticle.plant_id + '-' + editArticle.material_id}
+            plantId={editArticle.plant_id}
+            role={editArticle.role}
+            categories={[...new Set([editArticle.category, ...categoriesFor(plant?.processes ?? [], 'raw')])]}
+            article={editArticle}
+            onDone={() => { setEditArticle(null); refresh() }}
+          />
+        </Card>
+      )}
+
       {/* The balance itself, so nobody has to add the ledger up in their head. */}
       {loading && !data ? <Spinner /> : (
         <>
@@ -364,6 +378,7 @@ export default function Materials() {
                       rows={rows}
                       scope={scope}
                       onEditReorder={saveReorder}
+                      onEdit={manage ? setEditArticle : undefined}
                       editing={editing}
                       setEditing={setEditing}
                     />
@@ -374,6 +389,7 @@ export default function Materials() {
                   rows={inRole}
                   scope={scope}
                   onEditReorder={saveReorder}
+                  onEdit={manage ? setEditArticle : undefined}
                   editing={editing}
                   setEditing={setEditing}
                 />

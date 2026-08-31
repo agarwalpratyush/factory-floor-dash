@@ -35,8 +35,18 @@ const AREA_CATEGORIES = ['Gabion Box', 'Rolls', 'Mattress']
  *  but not a gauge, which is a different question and not this one. */
 const WIRE_CATEGORIES = ['Base Wire', 'GI Wire', 'Polymer Coated GI Wire']
 
-export function AddMaterialForm({
-  plantId, role, categories, onDone,
+/**
+ * One form for adding an article and for editing one. The code is the only thing
+ * that cannot change - it is how the article is known on a purchase order, a
+ * challan and every movement already recorded against it.
+ *
+ * Editing touches two tables: what the article *is* lives on `ff_materials` and is
+ * shared by both companies; how *this* company files and stocks it lives on
+ * `ff_material_plants`. Changing the name changes it everywhere, and that is
+ * correct - it is one article.
+ */
+export function ArticleForm({
+  plantId, role, categories, article, onDone,
 }: {
   plantId: number
   /** What this page holds. Raw Material creates raw, Finished Stock creates
@@ -47,27 +57,44 @@ export function AddMaterialForm({
   /** What this company may make or buy at this role. A list of one is still
    *  correct - it says there is one answer, not that the question is missing. */
   categories: string[]
+  /** Given, this edits that article instead of creating one. */
+  article?: StockLevel
   onDone: () => void
 }) {
+  const editing = article !== undefined
   // A finished article is sellable by definition; anything else opts in. The
   // database enforces the first half, so this only has to offer the second.
-  const [sellable, setSellable] = useState(false)
+  const [sellable, setSellable] = useState(article?.sellable ?? false)
+  const str = (v: number | null | undefined) => (v === null || v === undefined ? '' : String(v))
   const [f, setF] = useState({
     // MT is the standard, so it is what a new article starts on.
-    code: '', name: '', category: categories[0] ?? '',
-    sold_by_area: false,
-    opening_stock: '', opening_packs: '', reorder_level: '',
-    core_mm: '', od_mm: '',
-    core_tol_minus: '', core_tol_plus: '', od_tol_minus: '', od_tol_plus: '',
+    code: article?.code ?? '',
+    name: article?.name ?? '',
+    category: article?.category ?? categories[0] ?? '',
+    sold_by_area: article?.sold_by_area ?? false,
+    opening_stock: str(article?.opening_stock),
+    opening_packs: str(article?.opening_packs),
+    reorder_level: article
+      ? str(Number(article.reorder_packs) > 0 ? article.reorder_packs : article.reorder_level)
+      : '',
+    core_mm: str(article?.core_mm),
+    od_mm: str(article?.od_mm),
+    core_tol_minus: str(article?.core_tol_minus),
+    core_tol_plus: str(article?.core_tol_plus),
+    od_tol_minus: str(article?.od_tol_minus),
+    od_tol_plus: str(article?.od_tol_plus),
   })
   // Opening stock is typed in whichever unit the person has it in, like a purchase.
   // Where it lands is not a choice: every new article is kept in MT.
   const [openingUnit, setOpeningUnit] = useState<'MT' | 'kg'>('MT')
   // A reorder level is one number in one measure; which measure is the other half
   // of the answer, not a second level.
-  const [reorderIn, setReorderIn] = useState<'weight' | 'packs'>('weight')
+  const [reorderIn, setReorderIn] = useState<'weight' | 'packs'>(
+    article && Number(article.reorder_packs) > 0 ? 'packs' : 'weight',
+  )
   // The sizes and what a coil may vary from them, opened on request.
   const [tolOpen, setTolOpen] = useState(false)
+  const [confirming, setConfirming] = useState(false)
 
   /** The category is the only choice here: it decides what the article is counted
    *  in, and whether it is measured by area. A trigger sets the pack word from it. */
@@ -81,28 +108,66 @@ export function AddMaterialForm({
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  /** What the article is, shared by both companies. */
+  function articleFields() {
+    return {
+      name: f.name.trim(),
+      category: f.category,
+      // The size it is made to belongs to the article, so every shift is checked
+      // against the same target rather than one typed that morning.
+      core_mm: f.core_mm ? Number(f.core_mm) : null,
+      od_mm: f.od_mm ? Number(f.od_mm) : null,
+      core_tol_minus: f.core_tol_minus ? Number(f.core_tol_minus) : null,
+      core_tol_plus: f.core_tol_plus ? Number(f.core_tol_plus) : null,
+      od_tol_minus: f.od_tol_minus ? Number(f.od_tol_minus) : null,
+      od_tol_plus: f.od_tol_plus ? Number(f.od_tol_plus) : null,
+      sold_by_area: f.sold_by_area,
+    }
+  }
+
+  /** How this company files and stocks it. */
+  function plantFields() {
+    return {
+      // How this company files it. The article carries the same to begin with;
+      // they part company only where two companies file one article differently.
+      category: f.category,
+      sellable: role === 'finished' ? true : sellable,
+      opening_stock: f.opening_stock ? toStored(Number(f.opening_stock), openingUnit, STOCK_UNIT) : 0,
+      opening_packs: f.opening_packs ? Number(f.opening_packs) : 0,
+      // One measure or the other. Null rather than zero on the one not chosen:
+      // not watching a measure is not the same as watching it for zero.
+      reorder_level: role === 'raw' && reorderIn === 'weight' && f.reorder_level
+        ? toStored(Number(f.reorder_level), 'MT', STOCK_UNIT)
+        : 0,
+      reorder_packs: role === 'raw' && reorderIn === 'packs' && f.reorder_level
+        ? Number(f.reorder_level)
+        : null,
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     setErr(null)
 
+    if (article) {
+      // Two tables, because the two halves belong to different owners: the name
+      // and the gauge are the article's and change for both companies; the
+      // filing and the levels are this company's alone.
+      const upd = await supabase.from('ff_materials').update(articleFields()).eq('id', article.material_id)
+      if (upd.error) { setBusy(false); setErr(upd.error.message); return }
+
+      const updPlant = await supabase.from('ff_material_plants').update(plantFields())
+        .eq('material_id', article.material_id).eq('plant_id', article.plant_id)
+      setBusy(false)
+      if (updPlant.error) setErr(updPlant.error.message)
+      else onDone()
+      return
+    }
+
     const { data, error: makeErr } = await supabase
       .from('ff_materials')
-      .insert({
-        code: f.code.trim().toUpperCase(),
-        name: f.name.trim(),
-        category: f.category,
-        unit: STOCK_UNIT,
-        // The size it is made to belongs to the article, so every shift is checked
-        // against the same target rather than one typed that morning.
-        core_mm: f.core_mm ? Number(f.core_mm) : null,
-        od_mm: f.od_mm ? Number(f.od_mm) : null,
-        core_tol_minus: f.core_tol_minus ? Number(f.core_tol_minus) : null,
-        core_tol_plus: f.core_tol_plus ? Number(f.core_tol_plus) : null,
-        od_tol_minus: f.od_tol_minus ? Number(f.od_tol_minus) : null,
-        od_tol_plus: f.od_tol_plus ? Number(f.od_tol_plus) : null,
-        sold_by_area: f.sold_by_area,
-      })
+      .insert({ ...articleFields(), code: f.code.trim().toUpperCase(), unit: STOCK_UNIT })
       .select('id')
       .single()
     if (makeErr) {
@@ -115,37 +180,43 @@ export function AddMaterialForm({
       return
     }
 
-    const src = f
     const { error } = await supabase.from('ff_material_plants').insert({
-      material_id: data.id,
-      plant_id: plantId,
-      // How this company files it. The article carries the same to begin with;
-      // they part company only where two companies file one article differently.
-      category: f.category,
-      role,
-      sellable: role === 'finished' ? true : sellable,
-      opening_stock: src.opening_stock ? toStored(Number(src.opening_stock), openingUnit, STOCK_UNIT) : 0,
-      opening_packs: src.opening_packs ? Number(src.opening_packs) : 0,
-      // Only raw materials get reordered; the rest are produced to demand.
-      // One measure or the other. Null rather than zero on the one not chosen:
-      // not watching a measure is not the same as watching it for zero.
-      reorder_level: role === 'raw' && reorderIn === 'weight' && src.reorder_level
-        ? toStored(Number(src.reorder_level), 'MT', STOCK_UNIT)
-        : 0,
-      reorder_packs: role === 'raw' && reorderIn === 'packs' && src.reorder_level
-        ? Number(src.reorder_level)
-        : null,
+      ...plantFields(), material_id: data.id, plant_id: plantId, role,
     })
     setBusy(false)
     if (error) setErr(error.message)
     else onDone()
   }
 
+  /** Only an article nothing has ever moved can go. Anything with a movement
+   *  behind it would take that movement with it, or be refused by the database. */
+  async function remove() {
+    if (!article) return
+    setBusy(true)
+    setErr(null)
+    const off = await supabase.from('ff_material_plants').delete()
+      .eq('material_id', article.material_id).eq('plant_id', article.plant_id)
+    if (off.error) { setBusy(false); setErr(off.error.message); return }
+    // The article itself goes only if no other company still stocks it.
+    await supabase.from('ff_materials').delete().eq('id', article.material_id)
+    setBusy(false)
+    setConfirming(false)
+    onDone()
+  }
+
   return (
     <form onSubmit={submit} className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <Field label="Code *">
-              <input required value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} className={inputCls} placeholder="GIW-4.00" />
+            <Field label={editing ? 'Code (cannot change)' : 'Code *'}>
+              <input
+                required={!editing}
+                readOnly={editing}
+                value={f.code}
+                onChange={(e) => setF({ ...f, code: e.target.value })}
+                className={inputCls + (editing ? ' bg-slate-100 text-slate-500' : '')}
+                title={editing ? 'How this article is known on a purchase order, a challan and every movement recorded against it' : undefined}
+                placeholder="GIW-4.00"
+              />
             </Field>
             <Field label="Name *">
               <input required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={inputCls} placeholder="GI Wire Roll 4.00 mm" />
@@ -320,19 +391,45 @@ export function AddMaterialForm({
       )}
 
       {err && <p className="text-sm text-red-600">{err}</p>}
-      <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Add to this company'}</Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="submit" disabled={busy}>
+          {busy ? 'Saving…' : editing ? 'Save changes' : 'Add to this company'}
+        </Button>
+        {editing && <Button type="button" variant="ghost" onClick={onDone}>Cancel</Button>}
+
+        {editing && Number(article.movements) > 0 && (
+          <span className="ml-auto text-xs text-slate-500">
+            {article.movements} movement{Number(article.movements) === 1 ? '' : 's'} recorded, so this
+            article cannot be removed — its history would go with it.
+          </span>
+        )}
+        {editing && Number(article.movements) === 0 && !confirming && (
+          <Button type="button" variant="ghost" className="ml-auto text-red-700" onClick={() => setConfirming(true)}>
+            Remove from this company
+          </Button>
+        )}
+        {editing && Number(article.movements) === 0 && confirming && (
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-600">Remove {article.code}?</span>
+            <Button type="button" variant="ghost" onClick={() => setConfirming(false)}>No</Button>
+            <Button type="button" variant="danger" disabled={busy} onClick={remove}>Remove</Button>
+          </div>
+        )}
+      </div>
     </form>
   )
 }
 
 /** One table per role, with the columns that role actually needs. */
 export function RoleTable({
-  role, rows, scope, onEditReorder, editing, setEditing,
+  role, rows, scope, onEditReorder, onEdit, editing, setEditing,
 }: {
   role: StockRole
   rows: StockLevel[]
   scope: PlantScope
   onEditReorder: (s: StockLevel, patch: { reorder_level?: number; reorder_packs?: number | null }) => void
+  /** Given, each row offers a way into the whole article. */
+  onEdit?: (s: StockLevel) => void
   editing: string | null
   setEditing: (k: string | null) => void
 }) {
@@ -365,6 +462,7 @@ export function RoleTable({
             <th className="pb-2 text-right font-medium">Balance</th>
             {isRaw && <th className="pb-2 text-right font-medium">Reorder at</th>}
             <th className="pb-2 font-medium">Last moved</th>
+            {onEdit && <th className="pb-2" />}
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -491,6 +589,17 @@ export function RoleTable({
                   )
                 })()}
                 <td className="py-2 whitespace-nowrap text-slate-600">{fmtDate(s.last_movement)}</td>
+                {onEdit && (
+                  <td className="py-2 pl-2 text-right">
+                    <button
+                      onClick={() => onEdit(s)}
+                      title={'Edit ' + s.code}
+                      className="rounded-md px-2 py-1 text-xs text-slate-500 ring-1 ring-slate-300 transition hover:bg-slate-100"
+                    >
+                      Edit
+                    </button>
+                  </td>
+                )}
               </tr>
             )
           })}

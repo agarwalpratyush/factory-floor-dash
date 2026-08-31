@@ -60,6 +60,18 @@ so storing it in MT would round 267.810 kg to 268. `fmtWeight` in
 `src/lib/format.ts` is the only place that decides how a weight reads, and
 `toStored` converts what was typed into what the article is kept in.
 
+**An article is editable; its code is not.** The same `ArticleForm` adds and edits,
+and every row on both stock pages has an Edit control. The code is fixed for the
+reason a worker code is: it is how the article is known on a purchase order, a
+challan and every movement recorded against it.
+
+An edit writes to **two tables**, and the split is the point. `articleFields()` is
+what the article *is* — name, category, sizes, tolerances — shared by both companies,
+because it is one article and a coil of it can move between them. `plantFields()` is
+how *this* company files and stocks it. Removing is offered only where nothing has
+ever moved, same rule as a worker, and takes the article itself only if no other
+company still stocks it.
+
 **Adding an article asks only what is actually a choice.** A balance is always a
 weight, so there is no unit to pick: `STOCK_UNIT` is `MT` and every new article is
 kept in it. kg is not an alternative, only a smaller way of saying the same thing,

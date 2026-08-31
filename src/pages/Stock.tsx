@@ -6,7 +6,7 @@ import { useAuth } from '../lib/auth'
 import {
   Button, Card, ErrorBox, NeedPlant, Spinner, Stat,
 } from '../components/ui'
-import { AddMaterialForm, ROLE_HINT, RoleTable } from '../components/stock'
+import { ArticleForm, ROLE_HINT, RoleTable } from '../components/stock'
 import { categoriesFor } from '../lib/types'
 import type { StockLevel } from '../lib/types'
 
@@ -24,6 +24,9 @@ export default function Stock() {
   const { data, loading, error, refresh } = useQuery(() => loadStock(scope), 'stock-' + scopeKey(scope))
   const [showNew, setShowNew] = useState(false)
   const [editing, setEditing] = useState<string | null>(null)
+  // Which article's whole record is open. Held by the page so the form can sit
+  // above the table rather than inside a row of it.
+  const [editArticle, setEditArticle] = useState<StockLevel | null>(null)
 
   const all = useMemo(() => (data?.stock ?? []).filter((s) => s.active), [data])
 
@@ -69,7 +72,7 @@ export default function Stock() {
 
       {showNew && plant && data && (
         <Card title={'Add a finished article to ' + plant.short_name}>
-          <AddMaterialForm
+          <ArticleForm
             plantId={plant.id}
             role="finished"
             categories={categoriesFor(plant.processes, 'finished')}
@@ -96,6 +99,19 @@ export default function Stock() {
         />
       </div>
 
+      {editArticle && (
+        <Card title={'Edit ' + editArticle.code}>
+          <ArticleForm
+            key={editArticle.plant_id + '-' + editArticle.material_id}
+            plantId={editArticle.plant_id}
+            role={editArticle.role}
+            categories={[...new Set([editArticle.category, ...categoriesFor(plant?.processes ?? [], 'finished')])]}
+            article={editArticle}
+            onDone={() => { setEditArticle(null); refresh() }}
+          />
+        </Card>
+      )}
+
       {loading ? <Spinner /> : error ? <ErrorBox error={error} onRetry={refresh} /> : (
         <Card title="Sellable articles">
           <p className="-mt-1 mb-3 text-xs text-slate-500">
@@ -110,6 +126,7 @@ export default function Stock() {
             rows={finished}
             scope={scope}
             onEditReorder={saveReorder}
+            onEdit={can('ff_manage') ? setEditArticle : undefined}
             editing={editing}
             setEditing={setEditing}
           />
