@@ -267,7 +267,7 @@ export function CoilEntryGrid({
     onDone()
   }
 
-  const cell = 'w-full rounded border border-slate-300 px-1.5 py-0.5 text-right text-[13px] leading-5 tabular-nums focus:border-blue-500 focus:ring-1 focus:ring-blue-100'
+  const cell = 'w-full rounded border border-slate-300 px-1.5 py-0.5 text-right text-[13px] leading-5 tabular-nums lg:px-2 lg:py-1 lg:text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-100'
 
   return (
     <form onSubmit={submit} className="space-y-4">
@@ -370,12 +370,12 @@ export function CoilEntryGrid({
           <table className="w-full min-w-[620px] table-fixed">
             <thead>
               <tr className="text-xs tracking-wide text-slate-500 uppercase">
-                <th className="w-8 pb-1 text-left font-medium">#</th>
-                <th className="w-28 pb-1 text-right font-medium">Base wire (kg)</th>
-                <th className="w-24 pb-1 text-right font-medium">Base size</th>
-                <th className="w-28 pb-1 text-right font-medium">Coated (kg)</th>
-                <th className="w-24 pb-1 text-right font-medium">Coated size</th>
-                {detailed && <th className="w-36 pb-1 pl-2 text-left font-medium">Time</th>}
+                <th className="w-8 pb-1 text-left font-medium lg:w-10">#</th>
+                <th className="w-28 pb-1 text-right font-medium lg:w-32">Base wire (kg)</th>
+                <th className="w-24 pb-1 text-right font-medium lg:w-28">Base size</th>
+                <th className="w-28 pb-1 text-right font-medium lg:w-32">Coated (kg)</th>
+                <th className="w-24 pb-1 text-right font-medium lg:w-28">Coated size</th>
+                {detailed && <th className="w-36 pb-1 pl-2 text-left font-medium lg:w-44">Time</th>}
                 <th className="pb-1 pl-2 text-left font-medium">Check</th>
               </tr>
             </thead>
@@ -387,25 +387,25 @@ export function CoilEntryGrid({
                 const isStop = !!r.at_time && role === 'stop'
                 const coilRow = (
                   <tr key={i}>
-                    <td className="py-px text-xs text-slate-400">{i + 1}</td>
-                    <td className="py-px pr-1">
+                    <td className="py-px text-xs text-slate-400 lg:py-0.5">{i + 1}</td>
+                    <td className="py-px pr-1 lg:py-0.5">
                       <input inputMode="decimal" value={r.gi_weight} onPaste={(e) => handlePaste(e, i)}
                         onChange={(e) => setRow(i, { gi_weight: e.target.value })} className={cell} />
                     </td>
-                    <td className="py-px pr-1">
+                    <td className="py-px pr-1 lg:py-0.5">
                       <input inputMode="decimal" value={r.gi_size}
                         onChange={(e) => setRow(i, { gi_size: e.target.value })} className={cell} />
                     </td>
-                    <td className="py-px pr-1">
+                    <td className="py-px pr-1 lg:py-0.5">
                       <input inputMode="decimal" value={r.pvc_weight}
                         onChange={(e) => setRow(i, { pvc_weight: e.target.value })} className={cell} />
                     </td>
-                    <td className="py-px pr-1">
+                    <td className="py-px pr-1 lg:py-0.5">
                       <input inputMode="decimal" value={r.pvc_size}
                         onChange={(e) => setRow(i, { pvc_size: e.target.value })} className={cell} />
                     </td>
                     {detailed && (
-                      <td className="py-px pl-2">
+                      <td className="py-px pl-2 lg:py-0.5">
                         <div className="flex items-center gap-1.5">
                           <input
                             type="time" value={r.at_time}
