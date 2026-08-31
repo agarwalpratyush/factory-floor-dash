@@ -80,6 +80,9 @@ export interface StockLevel {
   unit: string
   spec: Record<string, unknown>
   reorder_level: number
+  /** Reorder level as a count. Either measure being breached marks the article
+   *  low; null means that one is not watched. */
+  reorder_packs: number | null
   active: boolean
   opening_stock: number
   /** The count at the opening, alongside the weight. Nothing derives one from

@@ -261,14 +261,21 @@ export default function Materials() {
   const totalIn = ledger.filter((t) => t.direction === 'in').length
   const totalOut = ledger.filter((t) => t.direction === 'out').length
 
-  const low = held.filter((x) => x.role === 'raw' && Number(x.balance) < Number(x.reorder_level))
+  // Either measure running short is a reason to buy, so either counts here.
+  const low = held.filter((x) => x.role === 'raw' && (
+    (Number(x.reorder_level) > 0 && Number(x.balance) < Number(x.reorder_level))
+    || (x.reorder_packs !== null && Number(x.reorder_packs) > 0
+        && Number(x.packs_balance) < Number(x.reorder_packs))
+  ))
   const negative = held.filter((x) => Number(x.balance) < 0)
   const consumed = held.reduce((n, x) => n + Number(x.consumed ?? 0), 0)
 
-  async function saveReorder(x: StockLevel, value: number) {
+  /** Either level can be set on its own, and the count can be cleared back to
+   *  not watched, which is why it takes a patch rather than a number. */
+  async function saveReorder(x: StockLevel, patch: { reorder_level?: number; reorder_packs?: number | null }) {
     const { error } = await supabase
       .from('ff_material_plants')
-      .update({ reorder_level: value })
+      .update(patch)
       .eq('material_id', x.material_id)
       .eq('plant_id', x.plant_id)
     if (!error) { setEditing(null); refresh() }

@@ -99,11 +99,20 @@ carries it into the transfer in, and a return or a reissue puts back the count t
 went out. A short receipt leaves it null rather than scaling it, because a part load
 is recounted, not divided.
 `ff_materials.pack_unit` is `not null` — every article has a pack word — and a check
-constraint refuses a purchase with no count. The constraint is deliberately
-`NOT VALID`: the seventeen purchases already on the books predate the field and
-cannot be counted retrospectively, so the rule binds every row written from here,
-which is the part that can be true. A weighed amount stays optional, because that
+constraint refuses a purchase with no count. It is enforced by **BEFORE INSERT triggers**, not check
+constraints — and that distinction was learned the hard way. A `NOT VALID` check
+skips the initial scan but still fires when an old row is *updated*, which quietly
+made every row predating the count read-only: editing a reorder level on any of the
+twenty-nine existing articles failed. The rule is that new rows are counted, not
+that old rows are frozen. `ff_require_count()` covers openings, purchases and
+dispatch lines. A weighed amount stays optional, because that
 genuinely is not always taken.
+
+**A reorder level can be a weight, a count, or both.** `reorder_level` and
+`reorder_packs` are independent: either being breached marks the article low, and
+null means that measure is not watched — which is not the same as watching it for
+zero, since zero would flag nothing for ever. Whichever runs out first is the one
+that stops the line, so neither is derived from the other.
 
 **Square metres are not entered at all — they will be calculated.** Pratyush has the
 formulas and will supply them when Agarwal work resumes; until then the entry form

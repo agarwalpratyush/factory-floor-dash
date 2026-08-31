@@ -46,7 +46,7 @@ export function AddMaterialForm({
     // MT is the standard, so it is what a new article starts on.
     code: '', name: '', category: MATERIAL_CATEGORIES[0],
     sold_by_area: false,
-    opening_stock: '', opening_packs: '', reorder_level: '',
+    opening_stock: '', opening_packs: '', reorder_level: '', reorder_packs: '',
   })
   // Opening stock is typed in whichever unit the person has it in, like a purchase.
   // Where it lands is not a choice: every new article is kept in MT.
@@ -102,6 +102,9 @@ export function AddMaterialForm({
       reorder_level: role === 'raw' && src.reorder_level
         ? toStored(Number(src.reorder_level), openingUnit, STOCK_UNIT)
         : 0,
+      // Null rather than zero: not watching a measure is not the same as watching
+      // it for zero, and zero would flag nothing for ever.
+      reorder_packs: role === 'raw' && src.reorder_packs ? Number(src.reorder_packs) : null,
     })
     setBusy(false)
     if (error) setErr(error.message)
@@ -152,7 +155,18 @@ export function AddMaterialForm({
           </div>
         </Field>
         {role === 'raw' && (
-          <Field label="Reorder level">
+          <Field label={'Reorder at (' + (PACK_BY_CATEGORY[f.category] ?? 'piece') + 's)'}>
+            <input
+              type="number" step="1" min="0"
+              value={f.reorder_packs}
+              onChange={(e) => setF({ ...f, reorder_packs: e.target.value })}
+              className={inputCls}
+              placeholder="leave blank if not watched"
+            />
+          </Field>
+        )}
+        {role === 'raw' && (
+          <Field label="Reorder at (weight)">
             <input
               type="number" step="0.001"
               value={f.reorder_level}
@@ -209,7 +223,7 @@ export function RoleTable({
   role: StockRole
   rows: StockLevel[]
   scope: PlantScope
-  onEditReorder: (s: StockLevel, v: number) => void
+  onEditReorder: (s: StockLevel, patch: { reorder_level?: number; reorder_packs?: number | null }) => void
   editing: string | null
   setEditing: (k: string | null) => void
 }) {
@@ -246,7 +260,10 @@ export function RoleTable({
         </thead>
         <tbody className="divide-y divide-slate-100">
           {rows.map((s) => {
-            const low = isRaw && Number(s.balance) < Number(s.reorder_level)
+            const lowWeight = isRaw && Number(s.reorder_level) > 0 && Number(s.balance) < Number(s.reorder_level)
+            const lowPacks = isRaw && s.reorder_packs !== null && Number(s.reorder_packs) > 0
+              && Number(s.packs_balance) < Number(s.reorder_packs)
+            const low = lowWeight || lowPacks
             const neg = Number(s.balance) < 0
             return (
               <tr key={keyOf(s)} className={neg ? 'bg-red-50/60' : low ? 'bg-amber-50/50' : 'hover:bg-slate-50'}>
@@ -319,19 +336,46 @@ export function RoleTable({
                 </td>
                 {isRaw && (
                   <td className="py-2 text-right">
-                    {editing === keyOf(s) ? (
+                    {editing === keyOf(s) + ':weight' ? (
                       <input
                         autoFocus type="number" step="0.001"
                         defaultValue={Number(s.reorder_level)}
-                        onBlur={(e) => onEditReorder(s, Number(e.target.value))}
+                        onBlur={(e) => onEditReorder(s, { reorder_level: Number(e.target.value) })}
                         onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
                         className="w-24 rounded-md border border-slate-300 px-2 py-1 text-right text-sm tabular-nums"
                       />
                     ) : (
-                      <button onClick={() => setEditing(keyOf(s))} className="tabular-nums text-slate-600 underline decoration-dotted underline-offset-2 hover:text-blue-600">
-                        {fmtQty(s.reorder_level)}
+                      <button
+                        onClick={() => setEditing(keyOf(s) + ':weight')}
+                        className={'tabular-nums underline decoration-dotted underline-offset-2 hover:text-blue-600 '
+                          + (lowWeight ? 'text-amber-700' : 'text-slate-600')}
+                      >
+                        {fmtWeight(s.reorder_level, s.unit)}
                       </button>
                     )}
+                    <div className="text-xs">
+                      {editing === keyOf(s) + ':packs' ? (
+                        <input
+                          autoFocus type="number" step="1" min="0"
+                          defaultValue={s.reorder_packs === null ? '' : Number(s.reorder_packs)}
+                          onBlur={(e) => onEditReorder(s, {
+                            reorder_packs: e.target.value === '' ? null : Number(e.target.value),
+                          })}
+                          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                          className="mt-1 w-24 rounded-md border border-slate-300 px-2 py-1 text-right text-xs tabular-nums"
+                        />
+                      ) : (
+                        <button
+                          onClick={() => setEditing(keyOf(s) + ':packs')}
+                          className={'tabular-nums underline decoration-dotted underline-offset-2 hover:text-blue-600 '
+                            + (lowPacks ? 'text-amber-700' : 'text-slate-400')}
+                        >
+                          {s.reorder_packs === null || Number(s.reorder_packs) === 0
+                            ? 'no ' + s.pack_unit + ' level'
+                            : fmtQty(s.reorder_packs) + ' ' + s.pack_unit + 's'}
+                        </button>
+                      )}
+                    </div>
                   </td>
                 )}
                 <td className="py-2 whitespace-nowrap text-slate-600">{fmtDate(s.last_movement)}</td>

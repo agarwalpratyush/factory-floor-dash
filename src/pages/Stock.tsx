@@ -37,12 +37,14 @@ export default function Stock() {
   const held = finished.filter((s) => Number(s.balance) > 0)
   const idle = finished.filter((s) => !s.last_movement)
 
-  async function saveReorder(s: StockLevel, value: number) {
+  /** Either level can be set on its own, and the count can be cleared back to
+   *  not watched, which is why it takes a patch rather than a number. */
+  async function saveReorder(x: StockLevel, patch: { reorder_level?: number; reorder_packs?: number | null }) {
     const { error } = await supabase
       .from('ff_material_plants')
-      .update({ reorder_level: value })
-      .eq('material_id', s.material_id)
-      .eq('plant_id', s.plant_id)
+      .update(patch)
+      .eq('material_id', x.material_id)
+      .eq('plant_id', x.plant_id)
     if (!error) { setEditing(null); refresh() }
   }
 
