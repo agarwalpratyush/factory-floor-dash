@@ -436,6 +436,13 @@ export const STOCK_UNIT = 'MT'
 /** The floor's word for one pack. Counted alongside the weight, never converted. */
 export const PACK_UNITS = ['coil', 'bag', 'piece']
 
+/** The pack word capitalised, for a field label rather than a sentence. */
+export const PACK_LABEL: Record<string, string> = {
+  'Base Wire': 'Coils',
+  Polymer: 'Bags',
+  Product: 'Pcs',
+}
+
 /** The usual pack word for a category. A default offered, not a rule enforced. */
 export const PACK_BY_CATEGORY: Record<string, string> = {
   'Base Wire': 'coil',

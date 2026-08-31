@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { type PlantScope } from '../lib/plant'
 import { Button, Empty, Field, inputCls, PlantTag } from './ui'
 import { fmtDate, fmtQty, fmtWeight, toStored } from '../lib/format'
-import { MATERIAL_CATEGORIES, PACK_BY_CATEGORY, STOCK_UNIT } from '../lib/types'
+import { MATERIAL_CATEGORIES, PACK_BY_CATEGORY, PACK_LABEL, STOCK_UNIT } from '../lib/types'
 import type { StockLevel, StockRole } from '../lib/types'
 
 /**
@@ -46,11 +46,14 @@ export function AddMaterialForm({
     // MT is the standard, so it is what a new article starts on.
     code: '', name: '', category: MATERIAL_CATEGORIES[0],
     sold_by_area: false,
-    opening_stock: '', opening_packs: '', reorder_level: '', reorder_packs: '',
+    opening_stock: '', opening_packs: '', reorder_level: '',
   })
   // Opening stock is typed in whichever unit the person has it in, like a purchase.
   // Where it lands is not a choice: every new article is kept in MT.
   const [openingUnit, setOpeningUnit] = useState<'MT' | 'kg'>('MT')
+  // A reorder level is one number in one measure; which measure is the other half
+  // of the answer, not a second level.
+  const [reorderIn, setReorderIn] = useState<'weight' | 'packs'>('weight')
 
   /** The category is the only choice here: it decides what the article is counted
    *  in, and whether it is measured by area. A trigger sets the pack word from it. */
@@ -99,12 +102,14 @@ export function AddMaterialForm({
       opening_stock: src.opening_stock ? toStored(Number(src.opening_stock), openingUnit, STOCK_UNIT) : 0,
       opening_packs: src.opening_packs ? Number(src.opening_packs) : 0,
       // Only raw materials get reordered; the rest are produced to demand.
-      reorder_level: role === 'raw' && src.reorder_level
-        ? toStored(Number(src.reorder_level), openingUnit, STOCK_UNIT)
+      // One measure or the other. Null rather than zero on the one not chosen:
+      // not watching a measure is not the same as watching it for zero.
+      reorder_level: role === 'raw' && reorderIn === 'weight' && src.reorder_level
+        ? toStored(Number(src.reorder_level), 'MT', STOCK_UNIT)
         : 0,
-      // Null rather than zero: not watching a measure is not the same as watching
-      // it for zero, and zero would flag nothing for ever.
-      reorder_packs: role === 'raw' && src.reorder_packs ? Number(src.reorder_packs) : null,
+      reorder_packs: role === 'raw' && reorderIn === 'packs' && src.reorder_level
+        ? Number(src.reorder_level)
+        : null,
     })
     setBusy(false)
     if (error) setErr(error.message)
@@ -125,7 +130,7 @@ export function AddMaterialForm({
                 {MATERIAL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
-        <Field label={'Opening ' + (PACK_BY_CATEGORY[f.category] ?? 'piece') + 's *'}>
+        <Field label={'Opening Stock (' + PACK_LABEL[f.category] + ') *'}>
           <input
             required
             type="number" step="1" min="0"
@@ -135,7 +140,7 @@ export function AddMaterialForm({
             title="How many were on hand at the opening. Counted, like the weight."
           />
         </Field>
-        <Field label="Opening stock">
+        <Field label="Opening Stock (Weight)">
           <div className="flex gap-2">
             <input
               type="number" step="0.001"
@@ -155,24 +160,25 @@ export function AddMaterialForm({
           </div>
         </Field>
         {role === 'raw' && (
-          <Field label={'Reorder at (' + (PACK_BY_CATEGORY[f.category] ?? 'piece') + 's)'}>
-            <input
-              type="number" step="1" min="0"
-              value={f.reorder_packs}
-              onChange={(e) => setF({ ...f, reorder_packs: e.target.value })}
-              className={inputCls}
-              placeholder="leave blank if not watched"
-            />
-          </Field>
-        )}
-        {role === 'raw' && (
-          <Field label="Reorder at (weight)">
-            <input
-              type="number" step="0.001"
-              value={f.reorder_level}
-              onChange={(e) => setF({ ...f, reorder_level: e.target.value })}
-              className={inputCls}
-            />
+          <Field label="Reorder at">
+            <div className="flex gap-2">
+              <input
+                type="number" step={reorderIn === 'packs' ? 1 : 0.001} min="0"
+                value={f.reorder_level}
+                onChange={(e) => setF({ ...f, reorder_level: e.target.value })}
+                className={inputCls}
+                placeholder="leave blank if not watched"
+              />
+              <select
+                value={reorderIn}
+                onChange={(e) => setReorderIn(e.target.value as 'weight' | 'packs')}
+                className="rounded-lg border border-slate-300 px-2 text-sm"
+                title="Whichever runs out first is the one that stops the line"
+              >
+                <option value="weight">MT</option>
+                <option value="packs">{PACK_BY_CATEGORY[f.category] ?? 'piece'}s</option>
+              </select>
+            </div>
           </Field>
         )}
       </div>
@@ -334,50 +340,53 @@ export function RoleTable({
                     </div>
                   )}
                 </td>
-                {isRaw && (
-                  <td className="py-2 text-right">
-                    {editing === keyOf(s) + ':weight' ? (
-                      <input
-                        autoFocus type="number" step="0.001"
-                        defaultValue={Number(s.reorder_level)}
-                        onBlur={(e) => onEditReorder(s, { reorder_level: Number(e.target.value) })}
-                        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                        className="w-24 rounded-md border border-slate-300 px-2 py-1 text-right text-sm tabular-nums"
-                      />
-                    ) : (
-                      <button
-                        onClick={() => setEditing(keyOf(s) + ':weight')}
-                        className={'tabular-nums underline decoration-dotted underline-offset-2 hover:text-blue-600 '
-                          + (lowWeight ? 'text-amber-700' : 'text-slate-600')}
-                      >
-                        {fmtWeight(s.reorder_level, s.unit)}
-                      </button>
-                    )}
-                    <div className="text-xs">
-                      {editing === keyOf(s) + ':packs' ? (
-                        <input
-                          autoFocus type="number" step="1" min="0"
-                          defaultValue={s.reorder_packs === null ? '' : Number(s.reorder_packs)}
-                          onBlur={(e) => onEditReorder(s, {
-                            reorder_packs: e.target.value === '' ? null : Number(e.target.value),
-                          })}
-                          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-                          className="mt-1 w-24 rounded-md border border-slate-300 px-2 py-1 text-right text-xs tabular-nums"
-                        />
+                {isRaw && (() => {
+                  // One level, in one measure. Which measure is part of the answer,
+                  // so it is chosen beside the number rather than in a second field:
+                  // setting it in coils means it is not being watched in weight.
+                  const inPacks = s.reorder_packs !== null && Number(s.reorder_packs) > 0
+                  const editKey = keyOf(s) + (inPacks ? ':packs' : ':weight')
+                  const editingPacks = editing === keyOf(s) + ':packs'
+                  const isEditing = editing === keyOf(s) + ':weight' || editingPacks
+                  return (
+                    <td className="py-2 text-right">
+                      {isEditing ? (
+                        <div className="flex justify-end gap-1">
+                          <input
+                            autoFocus
+                            type="number" step={editingPacks ? 1 : 0.001} min="0"
+                            defaultValue={editingPacks
+                              ? (s.reorder_packs === null ? '' : Number(s.reorder_packs))
+                              : Number(s.reorder_level)}
+                            onBlur={(e) => onEditReorder(s, editingPacks
+                              ? { reorder_packs: e.target.value === '' ? null : Number(e.target.value), reorder_level: 0 }
+                              : { reorder_level: Number(e.target.value), reorder_packs: null })}
+                            onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                            className="w-24 rounded-md border border-slate-300 px-2 py-1 text-right text-sm tabular-nums"
+                          />
+                          <select
+                            value={editingPacks ? 'packs' : 'weight'}
+                            onChange={(e) => setEditing(keyOf(s) + ':' + e.target.value)}
+                            className="rounded-md border border-slate-300 px-1 text-xs"
+                          >
+                            <option value="weight">{s.unit}</option>
+                            <option value="packs">{s.pack_unit}s</option>
+                          </select>
+                        </div>
                       ) : (
                         <button
-                          onClick={() => setEditing(keyOf(s) + ':packs')}
+                          onClick={() => setEditing(editKey)}
                           className={'tabular-nums underline decoration-dotted underline-offset-2 hover:text-blue-600 '
-                            + (lowPacks ? 'text-amber-700' : 'text-slate-400')}
+                            + (low ? 'text-amber-700' : 'text-slate-600')}
                         >
-                          {s.reorder_packs === null || Number(s.reorder_packs) === 0
-                            ? 'no ' + s.pack_unit + ' level'
-                            : fmtQty(s.reorder_packs) + ' ' + s.pack_unit + 's'}
+                          {inPacks
+                            ? fmtQty(s.reorder_packs) + ' ' + s.pack_unit + 's'
+                            : Number(s.reorder_level) > 0 ? fmtWeight(s.reorder_level, s.unit) : 'not set'}
                         </button>
                       )}
-                    </div>
-                  </td>
-                )}
+                    </td>
+                  )
+                })()}
                 <td className="py-2 whitespace-nowrap text-slate-600">{fmtDate(s.last_movement)}</td>
               </tr>
             )

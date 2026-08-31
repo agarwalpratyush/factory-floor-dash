@@ -108,11 +108,12 @@ that old rows are frozen. `ff_require_count()` covers openings, purchases and
 dispatch lines. A weighed amount stays optional, because that
 genuinely is not always taken.
 
-**A reorder level can be a weight, a count, or both.** `reorder_level` and
-`reorder_packs` are independent: either being breached marks the article low, and
-null means that measure is not watched — which is not the same as watching it for
-zero, since zero would flag nothing for ever. Whichever runs out first is the one
-that stops the line, so neither is derived from the other.
+**A reorder level is one number in one measure.** Weight or count, chosen beside
+the number rather than entered twice — watching an article in coils means it is not
+being watched in weight, and two independent levels would have been two answers to
+one question. Setting either clears the other: `reorder_level` goes to 0 and
+`reorder_packs` to null. Whichever measure is watched is the one that flags the
+article low.
 
 **Square metres are not entered at all — they will be calculated.** Pratyush has the
 formulas and will supply them when Agarwal work resumes; until then the entry form
