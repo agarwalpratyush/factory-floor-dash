@@ -420,7 +420,7 @@ export const ALL_DEPTS = [
  * one line, and should follow a real article rather than precede one.
  */
 export const MATERIAL_CATEGORIES = [
-  'GI Wire', 'Polymer', 'Polymer Coated Wire', 'Gabion Box', 'Rolls', 'Mattress',
+  'Base Wire', 'Polymer', 'Polymer Coated GI Wire', 'Gabion Box', 'Rolls', 'Mattress',
 ]
 
 /**
@@ -434,12 +434,16 @@ export const MATERIAL_CATEGORIES = [
  * an article nobody makes.
  */
 export const CATEGORIES_FOR: Record<PlantProcess, Record<StockRole, string[]>> = {
+  // Base Wire stays general on purpose: the coating plant may take copper in
+  // later, and the category should not need renaming when it does. The coated
+  // output is the opposite case - it is named exactly, because it is the one
+  // thing the fabrication plant buys.
   coating: {
-    raw: ['GI Wire', 'Polymer'],
-    finished: ['Polymer Coated Wire'],
+    raw: ['Base Wire', 'Polymer'],
+    finished: ['Polymer Coated GI Wire'],
   },
   fabrication: {
-    raw: ['GI Wire', 'Polymer Coated Wire'],
+    raw: ['Base Wire', 'Polymer Coated GI Wire'],
     finished: ['Gabion Box', 'Rolls', 'Mattress'],
   },
 }
@@ -465,8 +469,8 @@ export const PACK_UNITS = ['coil', 'bag', 'piece']
 
 /** The pack word capitalised, for a field label rather than a sentence. */
 export const PACK_LABEL: Record<string, string> = {
-  'GI Wire': 'Coils',
-  'Polymer Coated Wire': 'Coils',
+  'Base Wire': 'Coils',
+  'Polymer Coated GI Wire': 'Coils',
   Polymer: 'Bags',
   'Gabion Box': 'Pcs',
   Rolls: 'Pcs',
@@ -475,8 +479,8 @@ export const PACK_LABEL: Record<string, string> = {
 
 /** The usual pack word for a category. A default offered, not a rule enforced. */
 export const PACK_BY_CATEGORY: Record<string, string> = {
-  'GI Wire': 'coil',
-  'Polymer Coated Wire': 'coil',
+  'Base Wire': 'coil',
+  'Polymer Coated GI Wire': 'coil',
   Polymer: 'bag',
   'Gabion Box': 'piece',
   Rolls: 'piece',

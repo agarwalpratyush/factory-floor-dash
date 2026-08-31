@@ -145,8 +145,21 @@ that column exists for:
 
 | | raw | finished |
 |---|---|---|
-| **coating** | GI Wire, Polymer | Polymer Coated Wire |
-| **fabrication** | GI Wire, Polymer Coated Wire | Gabion Box, Rolls, Mattress |
+| **coating** | Base Wire, Polymer | Polymer Coated GI Wire |
+| **fabrication** | Base Wire, Polymer Coated GI Wire | Gabion Box, Rolls, Mattress |
+
+**Base Wire is general on purpose and should stay that way.** The coating plant may
+take copper in later, and the category must not need renaming when it does — it was
+briefly `GI Wire` and that was the mistake. The coated output is the opposite case
+and is named exactly, because it is the one thing the fabrication plant buys.
+*Polymer* rather than *PVC* for the same reason on the other half of the name: PVC
+is one polymer. A coated copper product would be a new article with its own
+category, which is the room Base Wire keeps open.
+
+Note that the four coated-wire articles are one article shared by both companies,
+so they carry **one** category — it reads correctly at both ends, as what Saffron
+makes and what Agarwal buys. Category is global to the article; only `role` is per
+company.
 
 A list of one is still a list: it says there is one answer, not that the question is
 missing. Offering Product on a raw page, or GI Wire on a finished one, invited
