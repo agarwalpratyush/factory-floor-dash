@@ -149,13 +149,15 @@ export function AddMaterialForm({
             title="How many were on hand at the opening. Counted, like the weight."
           />
         </Field>
-        <Field label="Opening Stock (Weight)">
+        <Field label="Opening Stock (Weight) *">
           <div className="flex gap-2">
             <input
-              type="number" step="0.001"
+              required
+              type="number" step="0.001" min="0"
               value={f.opening_stock}
               onChange={(e) => setF({ ...f, opening_stock: e.target.value })}
               className={inputCls}
+              title="Type 0 if there is none. A stated nothing is worth more than a blank."
             />
             <select
               value={openingUnit}
