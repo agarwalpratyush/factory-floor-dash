@@ -7,6 +7,7 @@ import {
   Button, Card, ErrorBox, NeedPlant, Spinner, Stat,
 } from '../components/ui'
 import { AddMaterialForm, ROLE_HINT, RoleTable } from '../components/stock'
+import { categoriesFor } from '../lib/types'
 import type { StockLevel } from '../lib/types'
 
 async function loadStock(scope: PlantScope) {
@@ -71,6 +72,7 @@ export default function Stock() {
           <AddMaterialForm
             plantId={plant.id}
             role="finished"
+            categories={categoriesFor(plant.processes, 'finished')}
             onDone={() => { setShowNew(false); refresh() }}
           />
         </Card>

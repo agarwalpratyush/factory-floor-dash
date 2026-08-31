@@ -139,6 +139,19 @@ count of how many movements actually carried each — a partial total must never
 as a full one. `ff_materials.pack_unit` supplies the floor's word (coil, bag,
 piece); `sold_by_area` decides whether square metres are asked for at all.
 
+**A page offers only the categories that company can have.** `CATEGORIES_FOR` is
+keyed on `ff_plants.processes` and the role, never on a plant code — the same rule
+that column exists for:
+
+| | raw | finished |
+|---|---|---|
+| **coating** | GI Wire, Polymer | Polymer Coated Wire |
+| **fabrication** | GI Wire, Polymer Coated Wire | Gabion Box, Rolls, Mattress |
+
+A list of one is still a list: it says there is one answer, not that the question is
+missing. Offering Product on a raw page, or GI Wire on a finished one, invited
+articles nobody makes.
+
 **Category is what an article is made of; role is what it does here.** Two
 different questions, and both are needed. `ff_materials.category` is global and
 carries the floor's own words — **Base Wire**, **Polymer**, Packing, Product —

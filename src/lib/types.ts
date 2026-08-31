@@ -419,7 +419,34 @@ export const ALL_DEPTS = [
  * tags and geotextile were removed for exactly that reason. Adding a category is
  * one line, and should follow a real article rather than precede one.
  */
-export const MATERIAL_CATEGORIES = ['Base Wire', 'Polymer', 'Product']
+export const MATERIAL_CATEGORIES = [
+  'GI Wire', 'Polymer', 'Polymer Coated Wire', 'Gabion Box', 'Rolls', 'Mattress',
+]
+
+/**
+ * Which categories a page may create, by what the company does and what the page
+ * holds. Keyed on the process rather than the plant, because a company taking on a
+ * new one should be a settings change - the same rule `ff_plants.processes` exists
+ * for.
+ *
+ * The point is that a list of one is still correct: a coating company's finished
+ * goods are coated wire and nothing else, and offering it Gabion Box would invite
+ * an article nobody makes.
+ */
+export const CATEGORIES_FOR: Record<PlantProcess, Record<StockRole, string[]>> = {
+  coating: {
+    raw: ['GI Wire', 'Polymer'],
+    finished: ['Polymer Coated Wire'],
+  },
+  fabrication: {
+    raw: ['GI Wire', 'Polymer Coated Wire'],
+    finished: ['Gabion Box', 'Rolls', 'Mattress'],
+  },
+}
+
+/** Everything the companies here between them may create, in one list. */
+export const categoriesFor = (processes: PlantProcess[], role: StockRole) =>
+  [...new Set(processes.flatMap((p) => CATEGORIES_FOR[p]?.[role] ?? []))]
 
 /**
  * Every balance is a weight, so there is nothing to choose: a new article is kept
@@ -438,16 +465,22 @@ export const PACK_UNITS = ['coil', 'bag', 'piece']
 
 /** The pack word capitalised, for a field label rather than a sentence. */
 export const PACK_LABEL: Record<string, string> = {
-  'Base Wire': 'Coils',
+  'GI Wire': 'Coils',
+  'Polymer Coated Wire': 'Coils',
   Polymer: 'Bags',
-  Product: 'Pcs',
+  'Gabion Box': 'Pcs',
+  Rolls: 'Pcs',
+  Mattress: 'Pcs',
 }
 
 /** The usual pack word for a category. A default offered, not a rule enforced. */
 export const PACK_BY_CATEGORY: Record<string, string> = {
-  'Base Wire': 'coil',
+  'GI Wire': 'coil',
+  'Polymer Coated Wire': 'coil',
   Polymer: 'bag',
-  Product: 'piece',
+  'Gabion Box': 'piece',
+  Rolls: 'piece',
+  Mattress: 'piece',
 }
 
 export const SHIFTS = [

@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { type PlantScope } from '../lib/plant'
 import { Button, Empty, Field, inputCls, PlantTag } from './ui'
 import { fmtDate, fmtQty, fmtWeight, toStored } from '../lib/format'
-import { MATERIAL_CATEGORIES, PACK_BY_CATEGORY, PACK_LABEL, STOCK_UNIT } from '../lib/types'
+import { PACK_BY_CATEGORY, PACK_LABEL, STOCK_UNIT } from '../lib/types'
 import type { StockLevel, StockRole } from '../lib/types'
 
 /**
@@ -28,8 +28,11 @@ export const ROLE_HINT: Record<StockRole, string> = {
  * way, so nothing new will. The mode is gone rather than sitting there for a case
  * that does not recur; a shared article is now a deliberate act, not a menu item.
  */
+/** Quoted by the square metre as well as by weight: everything woven. */
+const AREA_CATEGORIES = ['Gabion Box', 'Rolls', 'Mattress']
+
 export function AddMaterialForm({
-  plantId, role, onDone,
+  plantId, role, categories, onDone,
 }: {
   plantId: number
   /** What this page holds. Raw Material creates raw, Finished Stock creates
@@ -37,6 +40,9 @@ export function AddMaterialForm({
    *  would have two balances answering the same question. Passed rather than
    *  asked, because with work in progress gone there is only ever one answer. */
   role: StockRole
+  /** What this company may make or buy at this role. A list of one is still
+   *  correct - it says there is one answer, not that the question is missing. */
+  categories: string[]
   onDone: () => void
 }) {
   // A finished article is sellable by definition; anything else opts in. The
@@ -44,7 +50,7 @@ export function AddMaterialForm({
   const [sellable, setSellable] = useState(false)
   const [f, setF] = useState({
     // MT is the standard, so it is what a new article starts on.
-    code: '', name: '', category: MATERIAL_CATEGORIES[0],
+    code: '', name: '', category: categories[0] ?? '',
     sold_by_area: false,
     opening_stock: '', opening_packs: '', reorder_level: '',
   })
@@ -61,7 +67,7 @@ export function AddMaterialForm({
     setF((prev) => ({
       ...prev,
       category,
-      sold_by_area: category === 'Product' ? prev.sold_by_area : false,
+      sold_by_area: AREA_CATEGORIES.includes(category) ? prev.sold_by_area : false,
     }))
   }
   const [busy, setBusy] = useState(false)
@@ -127,7 +133,7 @@ export function AddMaterialForm({
             </Field>
             <Field label="Category">
               <select value={f.category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
-                {MATERIAL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
         <Field label={'Opening Stock (' + PACK_LABEL[f.category] + ') *'}>
@@ -189,7 +195,7 @@ export function AddMaterialForm({
         it, not a second way of holding the same stock.
       </p>
 
-      {f.category === 'Product' && (
+      {AREA_CATEGORIES.includes(f.category) && (
         <label className="flex items-center gap-2 text-sm text-slate-700">
           <input
             type="checkbox"

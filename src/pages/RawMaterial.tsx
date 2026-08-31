@@ -9,7 +9,7 @@ import {
 } from '../components/ui'
 import { AddMaterialForm, ROLE_HINT, RoleTable } from '../components/stock'
 import { daysAgo, fmtDate, fmtNum, fmtQty, fmtWeight, isWeight, toStored, today } from '../lib/format'
-import { MATERIAL_CATEGORIES, STOCK_ROLE_LABEL, TXN_TYPE_LABEL } from '../lib/types'
+import { MATERIAL_CATEGORIES, STOCK_ROLE_LABEL, TXN_TYPE_LABEL, categoriesFor } from '../lib/types'
 import type { Direction, MaterialTxn, Order, StockLevel, StockRole, TxnType } from '../lib/types'
 
 /**
@@ -303,6 +303,7 @@ export default function Materials() {
           <AddMaterialForm
             plantId={plant.id}
             role="raw"
+            categories={categoriesFor(plant.processes, 'raw')}
             onDone={() => { setShowNew(false); refresh() }}
           />
         </Card>
