@@ -20,7 +20,8 @@ const STATUS_TONE: Record<DispatchStatus, 'amber' | 'blue' | 'green' | 'red' | '
   received: 'green', returned: 'red', cancelled: 'slate',
 }
 
-interface ItemRow { material_id: string; qty: string }
+/** `packs` is compulsory: a coil count that only ever goes up is worse than none. */
+interface ItemRow { material_id: string; qty: string; packs: string }
 
 async function loadPage(scope: PlantScope, from: string) {
   const plant = scope === 'group' ? null : scope
@@ -78,7 +79,7 @@ function OutwardForm({
     driver_name: '', driver_phone: '', transporter: '', lr_no: '',
     destination: '', remarks: '',
   })
-  const [items, setItems] = useState<ItemRow[]>([{ material_id: '', qty: '' }])
+  const [items, setItems] = useState<ItemRow[]>([{ material_id: '', qty: '', packs: '' }])
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
@@ -101,7 +102,7 @@ function OutwardForm({
 
   function chooseKind(k: OutwardKind) {
     setKind(k)
-    setItems([{ material_id: '', qty: '' }])
+    setItems([{ material_id: '', qty: '', packs: '' }])
     if (k === 'inter_unit') {
       const dest = others.find((p) => String(p.id) === f.to_plant_id) ?? others[0]
       setF((prev) => ({ ...prev, order_id: '', destination: dest?.city ?? prev.destination }))
@@ -120,6 +121,8 @@ function OutwardForm({
   }
 
   const filled = items.filter((r) => r.material_id && Number(r.qty) > 0)
+  // A line is only ready when it has been counted, so the button says so.
+  const uncounted = filled.some((r) => !r.packs)
   const total = filled.reduce((s, r) => s + Number(r.qty), 0)
 
   async function submit(e: React.FormEvent) {
@@ -133,7 +136,10 @@ function OutwardForm({
       p_plant_id: plant.id,
       p_items: filled.map((r) => {
         const s = stock.find((x) => String(x.material_id) === r.material_id)
-        return { material_id: Number(r.material_id), qty: Number(r.qty), unit: s?.unit ?? 'nos' }
+        return {
+          material_id: Number(r.material_id), qty: Number(r.qty),
+          unit: s?.unit ?? 'nos', packs: Number(r.packs),
+        }
       }),
       p_kind: kind,
       p_to_plant_id: kind === 'inter_unit' ? Number(f.to_plant_id) : null,
@@ -158,7 +164,7 @@ function OutwardForm({
         : 'Dispatch OUT-' + data + ' recorded. ' + fmtQty(total) + ' taken out of finished stock.',
     )
     setF({ ...f, challan_no: '', vehicle_no: '', lr_no: '', remarks: '' })
-    setItems([{ material_id: '', qty: '' }])
+    setItems([{ material_id: '', qty: '', packs: '' }])
     onDone()
   }
 
@@ -216,7 +222,7 @@ function OutwardForm({
       <div>
         <div className="mb-2 flex items-center justify-between">
           <span className="text-xs font-semibold tracking-wide text-slate-500 uppercase">On the challan</span>
-          <button type="button" onClick={() => setItems((r) => [...r, { material_id: '', qty: '' }])} className="text-xs font-medium text-blue-600 hover:underline">
+          <button type="button" onClick={() => setItems((r) => [...r, { material_id: '', qty: '', packs: '' }])} className="text-xs font-medium text-blue-600 hover:underline">
             + Add item
           </button>
         </div>
@@ -241,6 +247,15 @@ function OutwardForm({
                     className={inputCls + ' w-32'}
                   />
                   {sel && <span className="self-center text-sm text-slate-500">{sel.unit}</span>}
+                  {sel && (
+                    <input
+                      type="number" step="1" min="1"
+                      placeholder={sel.pack_unit + 's'}
+                      value={row.packs} onChange={(e) => setItem(i, { packs: e.target.value })}
+                      className={inputCls + ' w-28'}
+                      title={'How many ' + sel.pack_unit + 's went out - counted, not worked out'}
+                    />
+                  )}
                   {items.length > 1 && (
                     <button type="button" onClick={() => setItems((r) => r.filter((_, n) => n !== i))} className="rounded-lg px-3 text-sm text-slate-500 ring-1 ring-slate-300 hover:bg-slate-50">
                       Remove
@@ -302,7 +317,7 @@ function OutwardForm({
       {err && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>}
       {ok && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">{ok}</p>}
 
-      <Button type="submit" disabled={busy || filled.length === 0}>
+      <Button type="submit" disabled={busy || filled.length === 0 || uncounted}>
         {busy ? 'Recording…' : (kind === 'inter_unit' ? 'Send load' : 'Record dispatch') + (total ? ' · ' + fmtQty(total) : '')}
       </Button>
     </form>

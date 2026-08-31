@@ -68,8 +68,14 @@ the article's own unit on save. `coil` is deliberately not a stock unit — a ba
 held in coils is a balance nobody can weigh; a coil is a count taken beside the
 weight.
 
-**Counting is compulsory; the other measures are not.** However an article is
-weighed, whoever books it in says how many coils, bags or pieces it was.
+**Counting is compulsory both ways; the other measures are not.** However an
+article is weighed, whoever books it in or sends it out says how many coils, bags
+or pieces it was. A count that only ever goes up is worse than no count, which is
+why Dispatch asks too: `ff_dispatch_items.qty_packs` is required by
+`ff_record_outward`, and the count travels with the goods — `ff_receive_outward`
+carries it into the transfer in, and a return or a reissue puts back the count that
+went out. A short receipt leaves it null rather than scaling it, because a part load
+is recounted, not divided.
 `ff_materials.pack_unit` is `not null` — every article has a pack word — and a check
 constraint refuses a purchase with no count. The constraint is deliberately
 `NOT VALID`: the seventeen purchases already on the books predate the field and
