@@ -163,13 +163,13 @@ function EntryForm({
           )}
         </Field>
         {mat?.pack_unit && (
-          <Field label={'How many ' + mat.pack_unit + 's'}>
+          <Field label={'How many ' + mat.pack_unit + 's *'}>
             <input
-              type="number" step="1" min="0"
+              required
+              type="number" step="1" min="1"
               value={f.packs} onChange={(e) => setF({ ...f, packs: e.target.value })}
               className={inputCls}
-              placeholder="if counted"
-              title={'Counted separately from the weight - a ' + mat.pack_unit + ' is not a fixed amount'}
+              title={'Counted, not worked out - a ' + mat.pack_unit + ' is not a fixed amount'}
             />
           </Field>
         )}
@@ -209,7 +209,7 @@ function EntryForm({
       {err && <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>}
       {ok && <p className="rounded-md bg-green-50 px-3 py-2 text-sm text-green-700">Saved. Stock updated.</p>}
 
-      <Button type="submit" disabled={busy || !f.material_id || !f.qty}>
+      <Button type="submit" disabled={busy || !f.material_id || !f.qty || (!!mat?.pack_unit && !f.packs)}>
         {busy ? 'Saving…' : 'Record purchase'}
       </Button>
     </form>

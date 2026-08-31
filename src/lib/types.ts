@@ -63,8 +63,9 @@ export interface StockLevel {
   code: string
   name: string
   category: string
-  /** The floor's word for one pack: coil, bag or piece. Carries no conversion. */
-  pack_unit: string | null
+  /** The floor's word for one pack: coil, bag or piece. Every article has one -
+   *  counting is compulsory. Carries no conversion to the weight. */
+  pack_unit: string
   /** Mesh and mesh products, which are sold by area as well as by weight. */
   sold_by_area: boolean
   role: StockRole

@@ -68,6 +68,15 @@ the article's own unit on save. `coil` is deliberately not a stock unit — a ba
 held in coils is a balance nobody can weigh; a coil is a count taken beside the
 weight.
 
+**Counting is compulsory; the other measures are not.** However an article is
+weighed, whoever books it in says how many coils, bags or pieces it was.
+`ff_materials.pack_unit` is `not null` — every article has a pack word — and a check
+constraint refuses a purchase with no count. The constraint is deliberately
+`NOT VALID`: the seventeen purchases already on the books predate the field and
+cannot be counted retrospectively, so the rule binds every row written from here,
+which is the part that can be true. Square metres and a weighed amount stay
+optional, because those genuinely are not always taken.
+
 **The second and third measures are observed, never derived.** A coil is not a
 standard weight, a bag is not reliably 25 kg, and a mesh roll is weighed rather than
 calculated — confirmed by Pratyush, who was explicit that no fixed factors exist and

@@ -79,7 +79,7 @@ export function AddMaterialForm({
         name: f.name.trim(),
         category: f.category,
         unit: f.unit,
-        pack_unit: f.pack_unit || null,
+        pack_unit: f.pack_unit,
         sold_by_area: f.sold_by_area,
       })
       .select('id')
@@ -132,9 +132,8 @@ export function AddMaterialForm({
                 {MATERIAL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
-            <Field label="Counted in">
-              <select value={f.pack_unit} onChange={(e) => setF({ ...f, pack_unit: e.target.value })} className={inputCls}>
-                <option value="">not counted</option>
+            <Field label="Counted in *">
+              <select required value={f.pack_unit} onChange={(e) => setF({ ...f, pack_unit: e.target.value })} className={inputCls}>
                 {PACK_UNITS.map((u) => <option key={u} value={u}>{u}s</option>)}
               </select>
             </Field>
