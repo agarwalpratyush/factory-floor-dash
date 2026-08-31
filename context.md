@@ -65,6 +65,12 @@ and every row on both stock pages has an Edit control. The code is fixed for the
 reason a worker code is: it is how the article is known on a purchase order, a
 challan and every movement recorded against it.
 
+Editing does **not** demand an opening count that was never taken. The rule was
+always that new rows are counted, not that old ones are frozen — `ff_require_count()`
+fires on insert only for exactly that reason — so the field is required when adding
+and optional when editing. Left blank it stays null, which means *nobody counted*
+and is not the same as a typed zero, which means *it opened with none*.
+
 An edit writes to **two tables**, and the split is the point. `articleFields()` is
 what the article *is* — name, category, sizes, tolerances — shared by both companies,
 because it is one article and a coil of it can move between them. `plantFields()` is

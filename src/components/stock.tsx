@@ -133,7 +133,9 @@ export function ArticleForm({
       category: f.category,
       sellable: role === 'finished' ? true : sellable,
       opening_stock: f.opening_stock ? toStored(Number(f.opening_stock), openingUnit, STOCK_UNIT) : 0,
-      opening_packs: f.opening_packs ? Number(f.opening_packs) : 0,
+      // Blank on an edit means still unknown, which is not the same as zero. A
+      // typed zero says the article opened with none; null says nobody counted.
+      opening_packs: f.opening_packs ? Number(f.opening_packs) : (editing ? null : 0),
       // One measure or the other. Null rather than zero on the one not chosen:
       // not watching a measure is not the same as watching it for zero.
       reorder_level: role === 'raw' && reorderIn === 'weight' && f.reorder_level
@@ -226,14 +228,17 @@ export function ArticleForm({
                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
-        <Field label={'Opening Stock (' + PACK_LABEL[f.category] + ') *'}>
+        <Field label={'Opening Stock (' + PACK_LABEL[f.category] + ')' + (editing ? '' : ' *')}>
           <input
-            required
+            required={!editing}
             type="number" step="1" min="0"
             value={f.opening_packs}
             onChange={(e) => setF({ ...f, opening_packs: e.target.value })}
             className={inputCls}
-            title="How many were on hand at the opening. Counted, like the weight."
+            placeholder={editing ? 'not counted' : undefined}
+            title={editing
+              ? 'Left blank it stays as it was. An article opened before counting cannot be counted backwards.'
+              : 'How many were on hand at the opening. Counted, like the weight.'}
           />
         </Field>
         <Field label="Opening Stock (Weight) *">
