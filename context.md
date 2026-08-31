@@ -338,8 +338,14 @@ sentence above the coils instead — *each coil is checked against 2.7 mm base w
 shifts of one product would then drift apart. Set them on Finished Stock, where the
 article lives.
 
-`GI_TOLERANCE` and `PVC_TOLERANCE` are named constants in `CoilLog.tsx`, used by
-both the entry form and the read-only view. They were literals buried in the flag
+**A tolerance belongs to the product, and has two sides.** `core_tol_minus`,
+`core_tol_plus`, `od_tol_minus` and `od_tol_plus` sit on `ff_materials`, set behind
+the **Tolerance** button on Finished Stock. Minus and plus are separate because a
+wire tolerance is often not symmetric — 0.06 over and 0.02 under is a real
+specification, and one plus-or-minus figure cannot express it. Do not collapse them.
+
+`GI_TOLERANCE` and `PVC_TOLERANCE` remain in `CoilLog.tsx` as the **fallback** for an
+article with none set, used by both the entry form and the read-only view. They were literals buried in the flag
 test, deciding which coils turned amber without ever being shown to the person being
 judged by them. An article with no size set is checked against **nothing** rather
 than against a leftover default, and the sentence says so.

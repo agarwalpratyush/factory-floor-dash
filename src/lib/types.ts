@@ -78,6 +78,13 @@ export interface StockLevel {
    *  target, rather than against whatever was typed that morning. */
   core_mm: number | null
   od_mm: number | null
+  /** How far a coil may measure from the nominal before it is flagged. Minus and
+   *  plus are separate because a wire tolerance is often not symmetric. Null
+   *  falls back to the client default. */
+  core_tol_minus: number | null
+  core_tol_plus: number | null
+  od_tol_minus: number | null
+  od_tol_plus: number | null
   role: StockRole
   /** May go out to a customer. Always true for a finished article, which since
    *  work in progress was dropped is everything that is made here. */

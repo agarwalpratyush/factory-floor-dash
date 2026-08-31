@@ -185,6 +185,16 @@ export function CoilEntryGrid({
   // Custom is the whole instruction: it is the shift with no hours in its name,
   // so it is the shift that has to say when the machine ran.
   const detailedShift = head.shift === 'G'
+
+  // Each product carries what a coil of it may measure. Minus and plus are
+  // separate, so a tolerance that is tighter on one side is checked as such.
+  const made = stock.find((x) => String(x.material_id) === head.pvc_material_id)
+  const tol = {
+    coreMinus: Number(made?.core_tol_minus ?? GI_TOLERANCE),
+    corePlus: Number(made?.core_tol_plus ?? GI_TOLERANCE),
+    odMinus: Number(made?.od_tol_minus ?? PVC_TOLERANCE),
+    odPlus: Number(made?.od_tol_plus ?? PVC_TOLERANCE),
+  }
   const timesWritten = rows.map((r) => r.at_time).filter(Boolean)
 
   const giTotal = filled.reduce((s, r) => s + Number(r.gi_weight), 0)
@@ -201,10 +211,13 @@ export function CoilEntryGrid({
       if (filled.length > 2 && Math.abs(p - pickup) > 6) out.push('pickup ' + p.toFixed(1) + '%')
       if (pvc <= gi) out.push('coated weight not above GI')
     }
-    if (r.gi_size && head.nominal_size_mm
-      && Math.abs(Number(r.gi_size) - Number(head.nominal_size_mm)) > GI_TOLERANCE) out.push('base dia')
-    if (r.pvc_size && head.target_pvc_size_mm
-      && Math.abs(Number(r.pvc_size) - Number(head.target_pvc_size_mm)) > PVC_TOLERANCE) out.push('coated dia')
+    const off = (measured: string, nominal: string, minus: number, plus: number) => {
+      if (!measured || !nominal) return false
+      const d = Number(measured) - Number(nominal)
+      return d < -minus || d > plus
+    }
+    if (off(r.gi_size, head.nominal_size_mm, tol.coreMinus, tol.corePlus)) out.push('base dia')
+    if (off(r.pvc_size, head.target_pvc_size_mm, tol.odMinus, tol.odPlus)) out.push('coated dia')
     return out
   }
 
@@ -325,11 +338,17 @@ export function CoilEntryGrid({
           <>
             Each coil is checked against{' '}
             {head.nominal_size_mm && (
-              <><strong>{head.nominal_size_mm} mm</strong> base wire (± {GI_TOLERANCE})</>
+              <>
+                <strong>{head.nominal_size_mm} mm</strong> base wire
+                {' '}(−{tol.coreMinus} / +{tol.corePlus})
+              </>
             )}
             {head.nominal_size_mm && head.target_pvc_size_mm && ' and '}
             {head.target_pvc_size_mm && (
-              <><strong>{head.target_pvc_size_mm} mm</strong> coated (± {PVC_TOLERANCE})</>
+              <>
+                <strong>{head.target_pvc_size_mm} mm</strong> coated
+                {' '}(−{tol.odMinus} / +{tol.odPlus})
+              </>
             )}
             . Anything outside that turns amber.
           </>

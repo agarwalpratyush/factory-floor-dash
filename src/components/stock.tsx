@@ -58,6 +58,7 @@ export function AddMaterialForm({
     sold_by_area: false,
     opening_stock: '', opening_packs: '', reorder_level: '',
     core_mm: '', od_mm: '',
+    core_tol_minus: '', core_tol_plus: '', od_tol_minus: '', od_tol_plus: '',
   })
   // Opening stock is typed in whichever unit the person has it in, like a purchase.
   // Where it lands is not a choice: every new article is kept in MT.
@@ -65,6 +66,8 @@ export function AddMaterialForm({
   // A reorder level is one number in one measure; which measure is the other half
   // of the answer, not a second level.
   const [reorderIn, setReorderIn] = useState<'weight' | 'packs'>('weight')
+  // The sizes and what a coil may vary from them, opened on request.
+  const [tolOpen, setTolOpen] = useState(false)
 
   /** The category is the only choice here: it decides what the article is counted
    *  in, and whether it is measured by area. A trigger sets the pack word from it. */
@@ -94,6 +97,10 @@ export function AddMaterialForm({
         // against the same target rather than one typed that morning.
         core_mm: f.core_mm ? Number(f.core_mm) : null,
         od_mm: f.od_mm ? Number(f.od_mm) : null,
+        core_tol_minus: f.core_tol_minus ? Number(f.core_tol_minus) : null,
+        core_tol_plus: f.core_tol_plus ? Number(f.core_tol_plus) : null,
+        od_tol_minus: f.od_tol_minus ? Number(f.od_tol_minus) : null,
+        od_tol_plus: f.od_tol_plus ? Number(f.od_tol_plus) : null,
         sold_by_area: f.sold_by_area,
       })
       .select('id')
@@ -179,25 +186,12 @@ export function AddMaterialForm({
             </select>
           </div>
         </Field>
-        {WIRE_CATEGORIES.includes(f.category) && (
-          <Field label="Base wire size (mm)">
-            <input
-              type="number" step="0.001" min="0"
-              value={f.core_mm} onChange={(e) => setF({ ...f, core_mm: e.target.value })}
-              className={inputCls}
-              placeholder="the wire inside"
-            />
-          </Field>
-        )}
-        {f.category === 'Polymer Coated GI Wire' && (
-          <Field label="Coated size (mm)">
-            <input
-              type="number" step="0.001" min="0"
-              value={f.od_mm} onChange={(e) => setF({ ...f, od_mm: e.target.value })}
-              className={inputCls}
-              placeholder="outside diameter"
-            />
-          </Field>
+        {WIRE_CATEGORIES.includes(f.category) && !tolOpen && (
+          <div className="flex items-end">
+            <Button type="button" variant="ghost" onClick={() => setTolOpen(true)}>
+              {f.core_mm || f.od_mm ? 'Tolerance · set' : 'Tolerance'}
+            </Button>
+          </div>
         )}
         {role === 'raw' && (
           <Field label="Reorder at">
@@ -256,6 +250,75 @@ export function AddMaterialForm({
           <span className="text-xs text-slate-500">— tick if this is resold as it stands</span>
         </label>
       )}
+      {tolOpen && WIRE_CATEGORIES.includes(f.category) && (
+        <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-xs font-semibold tracking-wide text-slate-500 uppercase">
+              Size and tolerance
+            </span>
+            <button type="button" onClick={() => setTolOpen(false)} className="text-xs text-slate-500 hover:underline">
+              Close
+            </button>
+          </div>
+          <p className="mb-3 text-xs text-slate-500">
+            What a coil is checked against on a shift log. Minus and plus are separate,
+            because a tolerance is often not the same either side. Left blank, the coil
+            log falls back to its own default.
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Field label="Base wire size (mm)">
+              <input type="number" step="0.001" min="0" value={f.core_mm}
+                onChange={(e) => setF({ ...f, core_mm: e.target.value })}
+                className={inputCls} placeholder="the wire inside" />
+            </Field>
+            <Field label="May measure under by">
+              <input type="number" step="0.001" min="0" value={f.core_tol_minus}
+                onChange={(e) => setF({ ...f, core_tol_minus: e.target.value })}
+                className={inputCls} placeholder="0.100" />
+            </Field>
+            <Field label="May measure over by">
+              <input type="number" step="0.001" min="0" value={f.core_tol_plus}
+                onChange={(e) => setF({ ...f, core_tol_plus: e.target.value })}
+                className={inputCls} placeholder="0.100" />
+            </Field>
+          </div>
+
+          {f.category === 'Polymer Coated GI Wire' && (
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              <Field label="Coated size (mm)">
+                <input type="number" step="0.001" min="0" value={f.od_mm}
+                  onChange={(e) => setF({ ...f, od_mm: e.target.value })}
+                  className={inputCls} placeholder="outside diameter" />
+              </Field>
+              <Field label="May measure under by">
+                <input type="number" step="0.001" min="0" value={f.od_tol_minus}
+                  onChange={(e) => setF({ ...f, od_tol_minus: e.target.value })}
+                  className={inputCls} placeholder="0.050" />
+              </Field>
+              <Field label="May measure over by">
+                <input type="number" step="0.001" min="0" value={f.od_tol_plus}
+                  onChange={(e) => setF({ ...f, od_tol_plus: e.target.value })}
+                  className={inputCls} placeholder="0.050" />
+              </Field>
+            </div>
+          )}
+
+          {f.core_mm && (
+            <p className="mt-3 text-xs text-slate-600">
+              A base wire coil passes between{' '}
+              <strong>{(Number(f.core_mm) - Number(f.core_tol_minus || 0)).toFixed(3)}</strong> and{' '}
+              <strong>{(Number(f.core_mm) + Number(f.core_tol_plus || 0)).toFixed(3)}</strong> mm.
+              {f.od_mm && (
+                <> Coated, between{' '}
+                <strong>{(Number(f.od_mm) - Number(f.od_tol_minus || 0)).toFixed(3)}</strong> and{' '}
+                <strong>{(Number(f.od_mm) + Number(f.od_tol_plus || 0)).toFixed(3)}</strong> mm.</>
+              )}
+            </p>
+          )}
+        </div>
+      )}
+
       {err && <p className="text-sm text-red-600">{err}</p>}
       <Button type="submit" disabled={busy}>{busy ? 'Saving…' : 'Add to this company'}</Button>
     </form>
