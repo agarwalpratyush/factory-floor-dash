@@ -49,7 +49,7 @@ export interface Material {
 export type StockRole = 'raw' | 'wip' | 'finished'
 
 export const STOCK_ROLE_LABEL: Record<StockRole, string> = {
-  raw: 'Raw materials & consumables',
+  raw: 'Raw material',
   wip: 'Work in progress',
   finished: 'Finished goods',
 }
