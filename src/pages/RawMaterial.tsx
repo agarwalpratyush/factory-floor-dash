@@ -10,7 +10,7 @@ import {
 import { AddMaterialForm, ROLE_HINT, RoleTable } from '../components/stock'
 import { daysAgo, fmtDate, fmtNum, fmtQty, today } from '../lib/format'
 import { MATERIAL_CATEGORIES, STOCK_ROLE_LABEL, TXN_TYPE_LABEL } from '../lib/types'
-import type { Direction, Material, MaterialTxn, Order, StockLevel, StockRole, TxnType } from '../lib/types'
+import type { Direction, MaterialTxn, Order, StockLevel, StockRole, TxnType } from '../lib/types'
 
 /**
  * What is bought in and consumed here: raw material, and the work in progress made
@@ -42,20 +42,17 @@ async function loadPage(scope: PlantScope, from: string) {
   let stockQ = supabase.from('ff_stock_levels').select('*').eq('active', true).order('code')
   if (plant !== null) stockQ = stockQ.eq('plant_id', plant)
 
-  const matQ = supabase.from('ff_materials').select('*').order('code')
-
   let orderQ = supabase.from('ff_orders').select('id,order_no,customer').neq('stage', 'delivered').order('order_no')
   if (plant !== null) orderQ = orderQ.eq('plant_id', plant)
 
-  const [txns, stock, orders, mats] = await Promise.all([txnQ, stockQ, orderQ, matQ])
+  const [txns, stock, orders] = await Promise.all([txnQ, stockQ, orderQ])
 
-  const failed = [txns, stock, orders, mats].find((r) => r.error)
+  const failed = [txns, stock, orders].find((r) => r.error)
   if (failed?.error) throw new Error(failed.error.message)
 
   return {
     txns: (txns.data ?? []) as MaterialTxn[],
     stock: (stock.data ?? []) as StockLevel[],
-    materials: (mats.data ?? []) as Material[],
     orders: (orders.data ?? []) as Pick<Order, 'id' | 'order_no' | 'customer'>[],
   }
 }
@@ -241,8 +238,6 @@ export default function Materials() {
         <Card title={'Add an article to ' + plant.short_name}>
           <AddMaterialForm
             plantId={plant.id}
-            existing={data.stock}
-            allMaterials={data.materials}
             allowedRoles={HELD_HERE}
             onDone={() => { setShowNew(false); refresh() }}
           />

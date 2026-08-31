@@ -4,7 +4,7 @@ import { type PlantScope } from '../lib/plant'
 import { Button, Empty, Field, inputCls, PlantTag } from './ui'
 import { fmtDate, fmtQty } from '../lib/format'
 import { MATERIAL_CATEGORIES } from '../lib/types'
-import type { Material, StockLevel, StockRole } from '../lib/types'
+import type { StockLevel, StockRole } from '../lib/types'
 
 /**
  * The article table and the add-an-article form, shared by the two pages that
@@ -20,59 +20,63 @@ export const ROLE_HINT: Record<StockRole, string> = {
 }
 
 /** Adds an article to this company's list, or creates a new one outright. */
+/**
+ * Creates an article and stocks it here, in one step.
+ *
+ * It used to offer a second mode - pick an article another company already has
+ * and stock it here too - which is what makes one article id live at both. Only
+ * the four coated wire codes need that, they already have it, and supply runs one
+ * way, so nothing new will. The mode is gone rather than sitting there for a case
+ * that does not recur; a shared article is now a deliberate act, not a menu item.
+ */
 export function AddMaterialForm({
-  plantId, existing, allMaterials, allowedRoles, onDone,
+  plantId, allowedRoles, onDone,
 }: {
   plantId: number
-  existing: StockLevel[]
-  allMaterials: Material[]
   /** Which roles this page is allowed to create. Raw Material owns raw and wip;
    *  Stock owns finished. Offering all three from both would let the same article
    *  be filed under two pages. */
   allowedRoles: StockRole[]
   onDone: () => void
 }) {
-  const [mode, setMode] = useState<'existing' | 'new'>('existing')
   const [role, setRole] = useState<StockRole>(allowedRoles[0])
   // A finished article is sellable by definition; anything else opts in. The
   // database enforces the first half, so this only has to offer the second.
   const [sellable, setSellable] = useState(false)
-  const [pick, setPick] = useState({ material_id: '', opening_stock: '', reorder_level: '' })
   const [f, setF] = useState({
     code: '', name: '', category: MATERIAL_CATEGORIES[0], unit: 'kg', opening_stock: '', reorder_level: '',
   })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
-  const stockedIds = new Set(existing.map((s) => s.material_id))
-  const notStocked = allMaterials.filter((m) => !stockedIds.has(m.id))
-
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setBusy(true)
     setErr(null)
 
-    let materialId: number
-    if (mode === 'existing') {
-      materialId = Number(pick.material_id)
-    } else {
-      const { data, error } = await supabase
-        .from('ff_materials')
-        .insert({
-          code: f.code.trim().toUpperCase(),
-          name: f.name.trim(),
-          category: f.category,
-          unit: f.unit,
-        })
-        .select('id')
-        .single()
-      if (error) { setBusy(false); setErr(error.message); return }
-      materialId = data.id
+    const { data, error: makeErr } = await supabase
+      .from('ff_materials')
+      .insert({
+        code: f.code.trim().toUpperCase(),
+        name: f.name.trim(),
+        category: f.category,
+        unit: f.unit,
+      })
+      .select('id')
+      .single()
+    if (makeErr) {
+      setBusy(false)
+      // Codes are unique across both companies, so the clash is usually with an
+      // article the other one already has. Say that rather than the raw error.
+      setErr(makeErr.code === '23505'
+        ? 'That code is already taken \u2014 possibly at the other company. Codes are unique across both, so pick another.'
+        : makeErr.message)
+      return
     }
 
-    const src = mode === 'existing' ? pick : f
+    const src = f
     const { error } = await supabase.from('ff_material_plants').insert({
-      material_id: materialId,
+      material_id: data.id,
       plant_id: plantId,
       role,
       sellable: role === 'finished' ? true : sellable,
@@ -87,27 +91,7 @@ export function AddMaterialForm({
 
   return (
     <form onSubmit={submit} className="space-y-3">
-      <div className="inline-flex rounded-lg bg-slate-100 p-1">
-        <button type="button" onClick={() => setMode('existing')}
-          className={'rounded-md px-4 py-2 text-sm font-medium transition ' + (mode === 'existing' ? 'bg-white shadow-sm' : 'text-slate-600')}>
-          Stock an existing article
-        </button>
-        <button type="button" onClick={() => setMode('new')}
-          className={'rounded-md px-4 py-2 text-sm font-medium transition ' + (mode === 'new' ? 'bg-white shadow-sm' : 'text-slate-600')}>
-          Create a new article
-        </button>
-      </div>
-
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {mode === 'existing' ? (
-          <Field label="Article *">
-            <select required value={pick.material_id} onChange={(e) => setPick({ ...pick, material_id: e.target.value })} className={inputCls}>
-              <option value="">Select…</option>
-              {notStocked.map((m) => <option key={m.id} value={m.id}>{m.code} — {m.name}</option>)}
-            </select>
-          </Field>
-        ) : (
-          <>
             <Field label="Code *">
               <input required value={f.code} onChange={(e) => setF({ ...f, code: e.target.value })} className={inputCls} placeholder="GIW-4.00" />
             </Field>
@@ -124,9 +108,6 @@ export function AddMaterialForm({
                 {MATERIAL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             </Field>
-          </>
-        )}
-
         <Field label="What is it here? *">
           <select value={role} onChange={(e) => setRole(e.target.value as StockRole)} className={inputCls}>
             {allowedRoles.includes('raw') && <option value="raw">Raw material — bought in, consumed here</option>}
@@ -137,10 +118,8 @@ export function AddMaterialForm({
         <Field label="Opening stock">
           <input
             type="number" step="0.001"
-            value={mode === 'existing' ? pick.opening_stock : f.opening_stock}
-            onChange={(e) => mode === 'existing'
-              ? setPick({ ...pick, opening_stock: e.target.value })
-              : setF({ ...f, opening_stock: e.target.value })}
+            value={f.opening_stock}
+            onChange={(e) => setF({ ...f, opening_stock: e.target.value })}
             className={inputCls}
           />
         </Field>
@@ -148,10 +127,8 @@ export function AddMaterialForm({
           <Field label="Reorder level">
             <input
               type="number" step="0.001"
-              value={mode === 'existing' ? pick.reorder_level : f.reorder_level}
-              onChange={(e) => mode === 'existing'
-                ? setPick({ ...pick, reorder_level: e.target.value })
-                : setF({ ...f, reorder_level: e.target.value })}
+              value={f.reorder_level}
+              onChange={(e) => setF({ ...f, reorder_level: e.target.value })}
               className={inputCls}
             />
           </Field>

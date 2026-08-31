@@ -42,6 +42,16 @@ company's *finished product* and the fabrication company's *raw material*. So
 plant) pair, not on the material. `ff_materials.category` is only the article's
 general nature.
 
+**Adding an article always creates one.** The form used to offer a second mode —
+pick an article the other company already has, and stock it here too — which is what
+puts one `material_id` at both plants. Only the four `PVCW-*` coated wire codes need
+that, because `ff_receive_outward` books a transfer in against the same article id
+the dispatch line named; they already have it, and supply runs one way, so no new
+article will. The mode is gone. **If Saffron ever coats a new size and sends it to
+Agarwal, that article has to exist at both** — which is now a deliberate insert into
+`ff_material_plants`, not something the form offers. Article codes are unique across
+both companies, and a clash is reported as such rather than as a Postgres error.
+
 **Category is what an article is made of; role is what it does here.** Two
 different questions, and both are needed. `ff_materials.category` is global and
 carries the floor's own words — **Base Wire**, **Polymer**, Packing, Product —

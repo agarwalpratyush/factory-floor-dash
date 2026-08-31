@@ -7,18 +7,14 @@ import {
   Button, Card, ErrorBox, NeedPlant, Spinner, Stat,
 } from '../components/ui'
 import { AddMaterialForm, ROLE_HINT, RoleTable } from '../components/stock'
-import type { Material, StockLevel } from '../lib/types'
+import type { StockLevel } from '../lib/types'
 
 async function loadStock(scope: PlantScope) {
   let q = supabase.from('ff_stock_levels').select('*').order('plant_code').order('code')
   if (scope !== 'group') q = q.eq('plant_id', scope)
-  const [stock, mats] = await Promise.all([
-    q,
-    supabase.from('ff_materials').select('*').order('code'),
-  ])
+  const stock = await q
   if (stock.error) throw new Error(stock.error.message)
-  if (mats.error) throw new Error(mats.error.message)
-  return { stock: (stock.data ?? []) as StockLevel[], materials: (mats.data ?? []) as Material[] }
+  return { stock: (stock.data ?? []) as StockLevel[] }
 }
 
 export default function Stock() {
@@ -72,8 +68,6 @@ export default function Stock() {
         <Card title={'Add a finished article to ' + plant.short_name}>
           <AddMaterialForm
             plantId={plant.id}
-            existing={all}
-            allMaterials={data.materials}
             allowedRoles={['finished']}
             onDone={() => { setShowNew(false); refresh() }}
           />
