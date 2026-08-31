@@ -53,6 +53,13 @@ The category was previously a seeded raw/consumable/packing taxonomy that nobody
 here uses, and the add-article form never showed the field at all — so every
 article added by hand was silently filed as `raw`. The form asks now.
 
+**Only what is manufactured is tracked.** Packing and site accessories are not
+stocked here. Seeded articles for HDPE strapping, bundle marking tags and
+geotextile were removed for that reason, and `MATERIAL_CATEGORIES` deliberately has
+no *Packing* or *Other* to file a stray into — an escape-hatch category is how a
+list like that fills back up. Adding a category is one line and should follow a
+real article rather than precede one.
+
 **What an article IS and whether it may be SOLD are separate facts.** A DT mesh
 roll is made to go into a gabion box *and* sold as it stands; one `role` per
 (material, plant) could not say both, and the effect was that no mesh roll could be

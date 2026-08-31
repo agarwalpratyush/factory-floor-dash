@@ -380,11 +380,16 @@ export const ALL_DEPTS = [
  *  used. 'G' is for group staff, who are not on a shift at all. */
 /**
  * What an article is made of, in the floor's words. Saffron buys base wire and
- * polymer; Agarwal buys wire. This is global to the article and groups the raw
- * material list - not to be confused with `role`, which is what the article does
- * at one company.
+ * polymer; Agarwal buys wire. Global to the article, and what the raw material
+ * list is grouped by - not to be confused with `role`, which is what the article
+ * does at one company.
+ *
+ * Deliberately short. Only what is manufactured is tracked here, so there is no
+ * Packing or Other to file a stray into: seeded articles for strapping, marking
+ * tags and geotextile were removed for exactly that reason. Adding a category is
+ * one line, and should follow a real article rather than precede one.
  */
-export const MATERIAL_CATEGORIES = ['Base Wire', 'Polymer', 'Packing', 'Product', 'Other']
+export const MATERIAL_CATEGORIES = ['Base Wire', 'Polymer', 'Product']
 
 export const SHIFTS = [
   { value: 'A', label: 'Day (8 am – 8 pm)' },
