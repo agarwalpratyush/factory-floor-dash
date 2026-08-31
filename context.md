@@ -66,7 +66,7 @@ reason a worker code is: it is how the article is known on a purchase order, a
 challan and every movement recorded against it.
 
 Editing does **not** demand an opening count that was never taken. The rule was
-always that new rows are counted, not that old ones are frozen — `ff_require_count()`
+always that new rows are counted, not that old ones are frozen — `ff_require_opening_count()`
 fires on insert only for exactly that reason — so the field is required when adding
 and optional when editing. Left blank it stays null, which means *nobody counted*
 and is not the same as a typed zero, which means *it opened with none*.
@@ -122,9 +122,24 @@ constraints — and that distinction was learned the hard way. A `NOT VALID` che
 skips the initial scan but still fires when an old row is *updated*, which quietly
 made every row predating the count read-only: editing a reorder level on any of the
 twenty-nine existing articles failed. The rule is that new rows are counted, not
-that old rows are frozen. `ff_require_count()` covers openings, purchases and
-dispatch lines. A weighed amount stays optional, because that
-genuinely is not always taken.
+that old rows are frozen. A weighed amount stays optional, because that genuinely
+is not always taken.
+
+**One trigger function per table, even when the rule reads the same.** Openings,
+purchases and dispatch lines all demand a count, so a single `ff_require_count()`
+served all three and branched on `tg_table_name`. It could not work: PL/pgSQL
+resolves `new.<field>` against the row actually being inserted, so the guard in
+front of a branch never protects the column reference inside it. An article insert
+reached the purchases branch and died on `new.txn_type`.
+
+The failure was the exact inverse of the intent, which is why it survived review.
+A row *without* a count stopped at the first branch and was refused as designed;
+a row *with* one fell through to a branch about another table and was refused by
+accident. Every insert that complied was rejected — new articles, purchases and
+dispatch lines alike — while the refusal path went on looking correct. Testing the
+rule being enforced is not testing the rule; the accepting path needs a case too.
+Now `ff_require_opening_count()`, `ff_require_purchase_count()` and
+`ff_require_dispatch_count()` each name only columns their own table has.
 
 **A reorder level is one number in one measure.** Weight or count, chosen beside
 the number rather than entered twice — watching an article in coils means it is not
