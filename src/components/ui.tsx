@@ -1,17 +1,69 @@
+import { useState } from 'react'
 import type { ReactNode } from 'react'
 
+/**
+ * `collapsible` turns the title into a toggle. The choice is remembered, because
+ * the header Refresh remounts the page below it - without that, anything folded
+ * away would spring back open on the next refresh and the fold would be useless.
+ *
+ * Only the title toggles, never the whole header: the `action` slot holds its own
+ * controls, and a button wrapping a select is both broken and invalid.
+ */
 export function Card({
-  title, action, children, className = '',
-}: { title?: string; action?: ReactNode; children: ReactNode; className?: string }) {
+  title, action, children, className = '', collapsible = false, defaultOpen = true,
+}: {
+  title?: string
+  action?: ReactNode
+  children: ReactNode
+  className?: string
+  collapsible?: boolean
+  defaultOpen?: boolean
+}) {
+  const key = 'ff.card.' + (title ?? '')
+  const [open, setOpen] = useState(() => {
+    if (!collapsible) return true
+    try {
+      const saved = localStorage.getItem(key)
+      return saved === null ? defaultOpen : saved === '1'
+    } catch {
+      return defaultOpen
+    }
+  })
+
+  function toggle() {
+    setOpen((wasOpen) => {
+      const next = !wasOpen
+      try { localStorage.setItem(key, next ? '1' : '0') } catch { /* private window */ }
+      return next
+    })
+  }
+
+  const heading = <h2 className="text-sm font-semibold tracking-wide text-slate-700 uppercase">{title}</h2>
+
   return (
     <section className={`rounded-xl bg-white shadow-sm ring-1 ring-slate-200 ${className}`}>
       {(title || action) && (
         <header className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
-          {title && <h2 className="text-sm font-semibold tracking-wide text-slate-700 uppercase">{title}</h2>}
+          {title && (collapsible ? (
+            <button
+              onClick={toggle}
+              aria-expanded={open}
+              className="-my-1 flex items-center gap-1.5 rounded-md py-1 pr-2 text-left transition hover:opacity-70"
+            >
+              <svg
+                viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+                strokeLinecap="round" strokeLinejoin="round" aria-hidden
+                className={'h-3.5 w-3.5 text-slate-400 transition-transform ' + (open ? '' : '-rotate-90')}
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+              {heading}
+            </button>
+          ) : heading)}
           {action}
         </header>
       )}
-      <div className="p-4">{children}</div>
+      {open && <div className="p-4">{children}</div>}
     </section>
   )
 }

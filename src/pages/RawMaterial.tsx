@@ -291,7 +291,7 @@ export default function Materials() {
             ].filter(([, rows]) => rows.length > 0)
 
             return (
-              <Card key={role} title={STOCK_ROLE_LABEL[role]}>
+              <Card key={role} title={STOCK_ROLE_LABEL[role]} collapsible={role === 'raw'}>
                 <p className="-mt-1 mb-3 text-xs text-slate-500">{ROLE_HINT[role]}</p>
                 {role === 'raw' && groups.length > 1 ? groups.map(([cat, rows]) => (
                   <div key={cat} className="mb-5 last:mb-0">
@@ -335,6 +335,7 @@ export default function Materials() {
       )}
 
       <Card
+        collapsible
         title="Movements in and out"
         action={
           <div className="flex flex-wrap gap-2">
