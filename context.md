@@ -285,23 +285,24 @@ Two things fall out of it that the paper cannot give you:
   rather than a process event. Transcribe what the register says and let the system
   flag it; never silently correct the source document.
 
-**A custom shift can be logged coil by coil.** *Add more details* adds a Time
-column to the grid: `ff_coil_entries.at_time` reads as the machine starting, then
-stopping, then starting again, **by how many times are written above it — not by
-row position**. So times in rows 1, 4 and 6 still read start, stop, start, and
-inserting a coil cannot change what an existing time says. Each filled box states
-which it is in words, because a column read this way is only safe if it says so.
+**Choosing Custom is the whole instruction.** It is the shift with no hours in its
+name, so it is the one that has to say when the machine ran — picking it adds a
+**Time** column to the coil grid, and nothing else asks. There is no separate pair
+of machine start/stop fields and no button to reveal the column: three ways to say
+the same thing, where one will do.
 
-It is opt-in, which is what makes it safe: the plain grid stays a transcription of
-the sheet and pasting a register still works, since a paste carries no times.
-`stop_note` lives on the coil the machine stopped at rather than on a row of its
-own — a row with no weights would be a coil that is not a coil, and every total
-would have to learn to skip it.
+`ff_coil_entries.at_time` reads as the machine starting, then stopping, then
+starting again, **by how many times are written above it — not by row position**. So
+times in rows 1, 5 and 9 still read start, stop, start, and inserting a coil cannot
+change what an existing time says. Each filled box states which it is in words,
+because a column read this way is only safe if it says so. `stop_note` lives on the
+coil the machine stopped at rather than on a row of its own — a row with no weights
+would be a coil that is not a coil, and every total would have to learn to skip it.
 
-**A custom shift says when the machine ran.** `ff_coil_logs.started_at` and
-`stopped_at` are asked for only when the shift is `G`; Day and Night carry their
-hours in their names. The span wraps past midnight, from the same helper the
-attendance page uses.
+`ff_coil_logs.started_at` and `stopped_at` are **derived from that column**, not
+asked for: the first time written, and the last one only when an even number were
+written. A shift that ends mid-run has no stop time, and filling one in would be
+inventing it.
 
 The shift date lives on the **page**, beside Cancel, not in the form — it is a
 header fact rather than one of the things being chosen. Being outside the `<form>`,

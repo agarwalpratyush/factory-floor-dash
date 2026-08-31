@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useQuery } from '../lib/useQuery'
 import { Button, ErrorBox, Field, inputCls, Spinner } from '../components/ui'
-import { fmtNum, fmtTime, spanHours } from '../lib/format'
+import { fmtNum, fmtTime } from '../lib/format'
 import { PRODUCTION_SHIFTS } from '../lib/types'
 import type { StockLevel } from '../lib/types'
 
@@ -16,7 +16,7 @@ const PVC_TOLERANCE = 0.05
 
 interface CoilRow {
   gi_weight: string; gi_size: string; pvc_weight: string; pvc_size: string
-  /** Only on a detailed log. Read down the column: the first time written is the
+  /** Only on a custom shift. Read down the column: the first time written is the
    *  machine starting, the next is it stopping, the one after that is it starting
    *  again. Order of writing is order of happening, as in the margin of the sheet. */
   at_time: string
@@ -143,14 +143,10 @@ export function CoilEntryGrid({
   const [head, setHead] = useState({
     shift: 'A',
     nominal_size_mm: '2.600', target_pvc_size_mm: '3.600',
-    started_at: '', stopped_at: '',
     gi_material_id: '', pvc_material_id: '', granule_material_id: '',
     power_cuts: '0', remarks: '',
   })
   const [rows, setRows] = useState<CoilRow[]>(Array.from({ length: 10 }, blankRow))
-  // Off unless asked for: the plain grid is a transcription of the sheet, and
-  // pasting a register into it must keep working.
-  const [detailed, setDetailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [ok, setOk] = useState<string | null>(null)
@@ -175,6 +171,11 @@ export function CoilEntryGrid({
   }
 
   const filled = rows.filter((r) => Number(r.gi_weight) > 0 && Number(r.pvc_weight) > 0)
+  // Custom is the whole instruction: it is the shift with no hours in its name,
+  // so it is the shift that has to say when the machine ran.
+  const detailedShift = head.shift === 'G'
+  const timesWritten = rows.map((r) => r.at_time).filter(Boolean)
+
   const giTotal = filled.reduce((s, r) => s + Number(r.gi_weight), 0)
   const pvcTotal = filled.reduce((s, r) => s + Number(r.pvc_weight), 0)
   const granules = pvcTotal - giTotal
@@ -251,9 +252,11 @@ export function CoilEntryGrid({
       p_log_date: logDate,
       p_shift: head.shift,
       p_shift_label: null,
-      // Only a custom shift carries them; Day and Night say their own hours.
-      p_started_at: head.shift === 'G' && head.started_at ? head.started_at : null,
-      p_stopped_at: head.shift === 'G' && head.stopped_at ? head.stopped_at : null,
+      // Taken from the column rather than asked for again. The last time is only
+      // a stop if an odd number were written; otherwise the shift ended mid-run
+      // and there is no stop time to record.
+      p_started_at: timesWritten[0] ?? null,
+      p_stopped_at: timesWritten.length % 2 === 0 ? timesWritten[timesWritten.length - 1] ?? null : null,
       p_target_pvc_size_mm: Number(head.target_pvc_size_mm),
       p_power_cuts: Number(head.power_cuts) || 0,
       p_remarks: head.remarks.trim() || null,
@@ -295,37 +298,6 @@ export function CoilEntryGrid({
             {PRODUCTION_SHIFTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
           </select>
         </Field>
-        {head.shift === 'G' && (
-          <Field label="Machine started">
-            <input
-              type="time" value={head.started_at}
-              onChange={(e) => setHead({ ...head, started_at: e.target.value })}
-              className={inputCls}
-            />
-          </Field>
-        )}
-        {head.shift === 'G' && (
-          <Field label="Machine stopped">
-            <input
-              type="time" value={head.stopped_at}
-              onChange={(e) => setHead({ ...head, stopped_at: e.target.value })}
-              className={inputCls}
-            />
-            {head.started_at && head.stopped_at && (
-              <p className="mt-1 text-xs text-slate-500">
-                {fmtTime(head.started_at)} → {fmtTime(head.stopped_at)} ·{' '}
-                {fmtNum(spanHours(head.started_at, head.stopped_at) ?? 0, 1)}h
-              </p>
-            )}
-          </Field>
-        )}
-        {head.shift === 'G' && !detailed && (
-          <div className="flex items-end">
-            <Button type="button" variant="ghost" onClick={() => setDetailed(true)}>
-              Add more details
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* Stated, not offered. The size comes off the article; a box here would
@@ -375,7 +347,7 @@ export function CoilEntryGrid({
                 <th className="w-24 pb-1 text-right font-medium lg:w-28">Base size</th>
                 <th className="w-28 pb-1 text-right font-medium lg:w-32">Coated (kg)</th>
                 <th className="w-24 pb-1 text-right font-medium lg:w-28">Coated size</th>
-                {detailed && <th className="w-36 pb-1 pl-2 text-left font-medium lg:w-44">Time</th>}
+                {detailedShift && <th className="w-36 pb-1 pl-2 text-left font-medium lg:w-44">Time</th>}
                 <th className="pb-1 pl-2 text-left font-medium">Check</th>
               </tr>
             </thead>
@@ -404,7 +376,7 @@ export function CoilEntryGrid({
                       <input inputMode="decimal" value={r.pvc_size}
                         onChange={(e) => setRow(i, { pvc_size: e.target.value })} className={cell} />
                     </td>
-                    {detailed && (
+                    {detailedShift && (
                       <td className="py-px pl-2 lg:py-0.5">
                         <div className="flex items-center gap-1.5">
                           <input
@@ -431,7 +403,7 @@ export function CoilEntryGrid({
                 return [coilRow, isStop ? (
                   <tr key={i + '-stop'}>
                     <td />
-                    <td colSpan={detailed ? 6 : 5} className="pt-0.5 pb-1.5">
+                    <td colSpan={detailedShift ? 6 : 5} className="pt-0.5 pb-1.5">
                       <input
                         value={r.stop_note}
                         onChange={(e) => setRow(i, { stop_note: e.target.value })}
