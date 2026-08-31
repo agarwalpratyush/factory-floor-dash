@@ -63,6 +63,10 @@ export interface StockLevel {
   code: string
   name: string
   category: string
+  /** The floor's word for one pack: coil, bag or piece. Carries no conversion. */
+  pack_unit: string | null
+  /** Mesh and mesh products, which are sold by area as well as by weight. */
+  sold_by_area: boolean
   role: StockRole
   /** May go out to a customer. Always true for a finished article; a wip one opts
    *  in, which is how a mesh roll can be both consumed here and sold as it stands. */
@@ -80,6 +84,16 @@ export interface StockLevel {
   purchased: number
   received_in: number
   sent_out: number
+  /** Observed measures, netted in and out. Each counts only the movements that
+   *  recorded it, hence the *_seen counts: a partial total must not read as a
+   *  full one. None of these converts to `balance`. */
+  packs_balance: number
+  weight_kg_balance: number
+  sqm_balance: number
+  packs_seen: number
+  weight_seen: number
+  sqm_seen: number
+  movements: number
   last_movement: string | null
 }
 
@@ -100,7 +114,11 @@ export interface MaterialTxn {
   remarks: string | null
   recorded_by: string | null
   ff_materials?: Pick<Material, 'code' | 'name' | 'unit'>
-  ff_orders?: { order_no: string } | null
+  ff_orders?: { order_no: string   /** Recorded, never derived - see the column comments. */
+  qty_packs: number | null
+  qty_weight_kg: number | null
+  qty_sqm: number | null
+} | null
 }
 
 export interface Worker {

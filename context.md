@@ -52,6 +52,29 @@ Agarwal, that article has to exist at both** — which is now a deliberate inser
 `ff_material_plants`, not something the form offers. Article codes are unique across
 both companies, and a clash is reported as such rather than as a Postgres error.
 
+**MT is how weight reads; the stored unit is an implementation detail.** Every
+weight shows in MT, dropping to kg under a tonne, and the purchase form types in MT
+by default with a kg option. Nothing was migrated to do it: polymer is still stored
+in kg because the coating register works to the gram and `qty` holds three decimals,
+so storing it in MT would round 267.810 kg to 268. `fmtWeight` in
+`src/lib/format.ts` is the only place that decides how a weight reads, and
+`toStored` converts what was typed into what the article is kept in.
+
+**The second and third measures are observed, never derived.** A coil is not a
+standard weight, a bag is not reliably 25 kg, and a mesh roll is weighed rather than
+calculated — confirmed by Pratyush, who was explicit that no fixed factors exist and
+that the numbers will accumulate as people enter them. So `ff_material_txns` carries
+`qty_packs`, `qty_weight_kg` and `qty_sqm`, all nullable, none convertible to `qty`
+or to each other. **Do not add a kg-per-coil or sqm-per-piece constant.** When
+enough real pairs exist, an average can be computed from them; a typed constant
+would be a guess that outlives its author.
+
+`qty` remains the single number stock arithmetic runs on, so a balance can never
+contradict itself. The observed measures net alongside it and are reported with a
+count of how many movements actually carried each — a partial total must never read
+as a full one. `ff_materials.pack_unit` supplies the floor's word (coil, bag,
+piece); `sold_by_area` decides whether square metres are asked for at all.
+
 **Category is what an article is made of; role is what it does here.** Two
 different questions, and both are needed. `ff_materials.category` is global and
 carries the floor's own words — **Base Wire**, **Polymer**, Packing, Product —

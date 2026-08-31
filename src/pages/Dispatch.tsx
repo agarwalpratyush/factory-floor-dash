@@ -7,7 +7,7 @@ import {
   Badge, Button, Card, Empty, ErrorBox, Field, inputCls,
   NeedPlant, PlantTag, Spinner, Stat,
 } from '../components/ui'
-import { daysAgo, fmtDate, fmtQty, today } from '../lib/format'
+import { daysAgo, fmtDate, fmtQty, fmtWeight, today } from '../lib/format'
 import type {
   Dispatch as Load, DispatchStatus, Order, OutwardKind, Plant, StockLevel, Worker,
 } from '../lib/types'
@@ -231,7 +231,7 @@ function OutwardForm({
                     <option value="">{kind === 'customer' ? 'Select an article…' : 'Select material…'}</option>
                     {sendable.map((s) => (
                       <option key={s.material_id} value={s.material_id}>
-                        {s.code} — {s.name} ({fmtQty(s.balance)} {s.unit} on hand)
+                        {s.code} — {s.name} ({fmtWeight(s.balance, s.unit)} on hand)
                       </option>
                     ))}
                   </select>
@@ -249,7 +249,7 @@ function OutwardForm({
                 </div>
                 {warn && (
                   <p className="mt-1 text-xs text-amber-700">
-                    Only {fmtQty(warn.have)} {warn.unit} on hand — this load puts stock {fmtQty(warn.short)} {warn.unit} negative.
+                    Only {fmtWeight(warn.have, warn.unit)} on hand — this load puts stock {fmtWeight(warn.short, warn.unit)} negative.
                   </p>
                 )}
               </div>
@@ -426,7 +426,7 @@ export default function Dispatch() {
                       <Badge tone={daysOut(d) > 5 ? 'red' : 'amber'}>{daysOut(d)}d out</Badge>
                     </div>
                     <p className="mt-0.5 text-xs text-slate-500">
-                      {lines.map((l) => fmtQty(l.qty) + ' ' + l.unit + ' ' + (l.ff_materials?.code ?? '')).join(' · ') || 'no items'}
+                      {lines.map((l) => fmtWeight(l.qty, l.unit) + ' ' + (l.ff_materials?.code ?? '')).join(' · ') || 'no items'}
                       {' · '}{d.challan_no ?? 'no challan'}{' · '}{d.vehicle_no ?? 'no vehicle'}
                     </p>
                   </div>
@@ -516,7 +516,7 @@ export default function Dispatch() {
                       </td>
                       <td className="py-2">
                         {lines.length === 0 ? (
-                          <span className="text-xs text-amber-700">{fmtQty(d.qty)} {d.unit} · no items recorded</span>
+                          <span className="text-xs text-amber-700">{fmtWeight(d.qty, d.unit)} · no items recorded</span>
                         ) : (
                           <div className="space-y-0.5">
                             {lines.map((l) => (

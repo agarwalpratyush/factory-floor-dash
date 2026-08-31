@@ -8,7 +8,7 @@ import {
   NeedPlant, PlantTag, Spinner, Stat,
 } from '../components/ui'
 import { AddMaterialForm, ROLE_HINT, RoleTable } from '../components/stock'
-import { daysAgo, fmtDate, fmtNum, fmtQty, today } from '../lib/format'
+import { daysAgo, fmtDate, fmtNum, fmtQty, fmtWeight, isWeight, toStored, today } from '../lib/format'
 import { MATERIAL_CATEGORIES, STOCK_ROLE_LABEL, TXN_TYPE_LABEL } from '../lib/types'
 import type { Direction, MaterialTxn, Order, StockLevel, StockRole, TxnType } from '../lib/types'
 
@@ -68,12 +68,19 @@ function EntryForm({
   const [f, setF] = useState({
     txn_date: today(), material_id: '', qty: '', unit_rate: '',
     party: '', ref_no: '', order_id: '', remarks: '',
+    packs: '', sqm: '',
   })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [ok, setOk] = useState(false)
 
   const mat = stock.find((m) => String(m.material_id) === f.material_id)
+
+  // Weight is typed in MT by default, whatever the article happens to be stored
+  // in. kg stays available because a delivery is sometimes weighed that way, and
+  // for anything under a tonne it is the natural number to say.
+  const [entryUnit, setEntryUnit] = useState<'MT' | 'kg'>('MT')
+  const weighed = isWeight(mat?.unit)
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -88,7 +95,10 @@ function EntryForm({
       txn_type: 'purchase',
       material_id: Number(f.material_id),
       plant_id: plantId,
-      qty: Number(f.qty),
+      qty: weighed && mat ? toStored(Number(f.qty), entryUnit, mat.unit) : Number(f.qty),
+      // Counted, not converted. Blank means nobody counted, which is not zero.
+      qty_packs: f.packs ? Number(f.packs) : null,
+      qty_sqm: f.sqm ? Number(f.sqm) : null,
       unit_rate: f.unit_rate ? Number(f.unit_rate) : null,
       party: f.party.trim() || null,
       ref_no: f.ref_no.trim() || null,
@@ -99,7 +109,7 @@ function EntryForm({
     setBusy(false)
     if (error) { setErr(error.message); return }
     setOk(true)
-    setF({ ...f, qty: '', unit_rate: '', ref_no: '', remarks: '' })
+    setF({ ...f, qty: '', unit_rate: '', ref_no: '', remarks: '', packs: '', sqm: '' })
     onDone()
   }
 
@@ -120,14 +130,59 @@ function EntryForm({
             <option value="">Select…</option>
             {stock.map((m) => (
               <option key={m.plant_id + '-' + m.material_id} value={m.material_id}>
-                {m.code} — {m.name} ({fmtQty(m.balance)} {m.unit})
+                {m.code} — {m.name} ({fmtWeight(m.balance, m.unit)})
               </option>
             ))}
           </select>
         </Field>
-        <Field label={'Quantity *' + (mat ? ' (' + mat.unit + ')' : '')}>
-          <input required type="number" step="0.001" min="0.001" value={f.qty} onChange={(e) => setF({ ...f, qty: e.target.value })} className={inputCls} />
+        <Field label="Quantity *">
+          <div className="flex gap-2">
+            <input
+              required type="number" step="0.001" min="0.001"
+              value={f.qty} onChange={(e) => setF({ ...f, qty: e.target.value })}
+              className={inputCls}
+            />
+            {weighed ? (
+              <select
+                value={entryUnit}
+                onChange={(e) => setEntryUnit(e.target.value as 'MT' | 'kg')}
+                className="rounded-lg border border-slate-300 px-2 text-sm"
+                title="Type the weight in whichever you have it"
+              >
+                <option value="MT">MT</option>
+                <option value="kg">kg</option>
+              </select>
+            ) : (
+              <span className="flex items-center px-2 text-sm text-slate-500">{mat?.unit ?? ''}</span>
+            )}
+          </div>
+          {weighed && f.qty !== '' && mat && (
+            <p className="mt-1 text-xs text-slate-500">
+              = {fmtWeight(toStored(Number(f.qty), entryUnit, mat.unit), mat.unit)}
+            </p>
+          )}
         </Field>
+        {mat?.pack_unit && (
+          <Field label={'How many ' + mat.pack_unit + 's'}>
+            <input
+              type="number" step="1" min="0"
+              value={f.packs} onChange={(e) => setF({ ...f, packs: e.target.value })}
+              className={inputCls}
+              placeholder="if counted"
+              title={'Counted separately from the weight - a ' + mat.pack_unit + ' is not a fixed amount'}
+            />
+          </Field>
+        )}
+        {mat?.sold_by_area && (
+          <Field label="Square metres">
+            <input
+              type="number" step="0.001" min="0"
+              value={f.sqm} onChange={(e) => setF({ ...f, sqm: e.target.value })}
+              className={inputCls}
+              placeholder="if measured"
+            />
+          </Field>
+        )}
         <Field label="Rate per unit (₹)">
           <input type="number" step="0.01" value={f.unit_rate} onChange={(e) => setF({ ...f, unit_rate: e.target.value })} className={inputCls} />
         </Field>
@@ -389,7 +444,7 @@ export default function Materials() {
                         <div className="font-medium text-slate-900">{t.ff_materials?.code}</div>
                         <div className="text-xs text-slate-500">{t.ff_materials?.name}</div>
                       </td>
-                      <td className="py-2 text-right tabular-nums text-slate-900">{fmtQty(t.qty)} {t.ff_materials?.unit}</td>
+                      <td className="py-2 text-right tabular-nums text-slate-900">{fmtWeight(t.qty, t.ff_materials?.unit ?? '')}</td>
                       {money && (
                         <td className="py-2 text-right tabular-nums text-slate-600">{t.unit_rate ? fmtNum(t.unit_rate, 2) : '—'}</td>
                       )}

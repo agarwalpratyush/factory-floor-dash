@@ -26,6 +26,40 @@ export const fmtDate = (d: string | null | undefined) => {
 }
 
 /**
+ * Weight is one quantity shown two ways. MT is the standard everywhere; under a
+ * tonne it reads in kg, because 0.048 MT is a number nobody pictures and 48 kg is.
+ *
+ * The stored unit is deliberately left alone - polymer is kept in kg because the
+ * coating register works to the gram and `qty` holds three decimals, so storing it
+ * in MT would round 267.810 kg to 268. Which unit a row is stored in is an
+ * implementation detail; this is the only place that decides how it reads.
+ */
+const KG_PER: Record<string, number> = { kg: 1, MT: 1000 }
+
+export const isWeight = (unit: string | null | undefined) =>
+  unit !== null && unit !== undefined && unit in KG_PER
+
+export const toKg = (qty: number, unit: string) => Number(qty) * (KG_PER[unit] ?? 1)
+
+/** Turns a weight typed in one unit into the unit the article is stored in. */
+export const toStored = (qty: number, typedIn: string, storedIn: string) =>
+  toKg(qty, typedIn) / (KG_PER[storedIn] ?? 1)
+
+/**
+ * A weight with its unit, chosen by size. Anything that is not a weight is passed
+ * through with its own unit, so callers do not have to ask first.
+ */
+export const fmtWeight = (qty: number | null | undefined, unit: string) => {
+  if (qty === null || qty === undefined || Number.isNaN(Number(qty))) return '—'
+  if (!isWeight(unit)) return fmtQty(qty) + ' ' + unit
+  const kg = toKg(Number(qty), unit)
+  // Negative balances happen and must still read as weights, hence the abs().
+  return Math.abs(kg) >= 1000
+    ? fmtNum(kg / 1000, 3) + ' MT'
+    : fmtQty(kg) + ' kg'
+}
+
+/**
  * Where a day sits relative to now, which is the one thing a date picker cannot
  * say. The weekday comes with it because an attendance page is often really
  * asking whether the day was a Sunday.

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { type PlantScope } from '../lib/plant'
 import { Button, Empty, Field, inputCls, PlantTag } from './ui'
-import { fmtDate, fmtQty } from '../lib/format'
+import { fmtDate, fmtQty, fmtWeight } from '../lib/format'
 import { MATERIAL_CATEGORIES } from '../lib/types'
 import type { StockLevel, StockRole } from '../lib/types'
 
@@ -211,27 +211,42 @@ export function RoleTable({
                   <div className="font-medium text-slate-900">{s.code}</div>
                   <div className="text-xs text-slate-500">{s.name}</div>
                 </td>
-                <td className="py-2 text-right tabular-nums text-slate-500">{fmtQty(s.opening_stock)}</td>
+                <td className="py-2 text-right tabular-nums text-slate-500">{fmtWeight(s.opening_stock, s.unit)}</td>
                 {isRaw ? (
                   <>
                     <td className="py-2 text-right tabular-nums text-green-700">
-                      +{fmtQty(Number(s.purchased) + Number(s.received_in))}
+                      +{fmtWeight(Number(s.purchased) + Number(s.received_in), s.unit)}
                       {Number(s.received_in) > 0 && (
-                        <span className="block text-xs font-normal text-slate-400">{fmtQty(s.received_in)} from other unit</span>
+                        <span className="block text-xs font-normal text-slate-400">{fmtWeight(s.received_in, s.unit)} from other unit</span>
                       )}
                     </td>
-                    <td className="py-2 text-right tabular-nums text-amber-700">−{fmtQty(s.consumed)}</td>
+                    <td className="py-2 text-right tabular-nums text-amber-700">−{fmtWeight(s.consumed, s.unit)}</td>
                   </>
                 ) : (
                   <>
-                    <td className="py-2 text-right tabular-nums text-green-700">+{fmtQty(s.produced)}</td>
+                    <td className="py-2 text-right tabular-nums text-green-700">+{fmtWeight(s.produced, s.unit)}</td>
                     <td className="py-2 text-right tabular-nums text-amber-700">
-                      −{fmtQty(role === 'wip' ? s.consumed : s.sent_out)}
+                      −{fmtWeight(role === 'wip' ? s.consumed : s.sent_out, s.unit)}
                     </td>
                   </>
                 )}
                 <td className={'py-2 text-right font-semibold tabular-nums ' + (neg ? 'text-red-600' : low ? 'text-amber-600' : 'text-slate-900')}>
-                  {fmtQty(s.balance)} <span className="text-xs font-normal text-slate-500">{s.unit}</span>
+                  {fmtWeight(s.balance, s.unit)}
+                  {(Number(s.packs_seen) > 0 || Number(s.sqm_seen) > 0) && (
+                    <div className="text-xs font-normal text-slate-500">
+                      {Number(s.packs_seen) > 0 && (
+                        <span title={Number(s.packs_seen) + ' of ' + s.movements + ' movements counted'}>
+                          {fmtQty(s.packs_balance)} {s.pack_unit}s
+                        </span>
+                      )}
+                      {Number(s.packs_seen) > 0 && Number(s.sqm_seen) > 0 && ' · '}
+                      {Number(s.sqm_seen) > 0 && (
+                        <span title={Number(s.sqm_seen) + ' of ' + s.movements + ' movements measured'}>
+                          {fmtQty(s.sqm_balance)} sqm
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </td>
                 {isRaw && (
                   <td className="py-2 text-right">
