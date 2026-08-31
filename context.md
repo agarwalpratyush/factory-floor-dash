@@ -60,6 +60,14 @@ so storing it in MT would round 267.810 kg to 268. `fmtWeight` in
 `src/lib/format.ts` is the only place that decides how a weight reads, and
 `toStored` converts what was typed into what the article is kept in.
 
+Adding an article asks all of it: what the balance is **kept in** (MT first, since
+weight is the standard), what it is **counted in** (the pack word, defaulted from the
+category and overridable), and whether it is **measured in square metres**. Opening
+stock and the reorder level are typed in MT or kg like a purchase and converted to
+the article's own unit on save. `coil` is deliberately not a stock unit — a balance
+held in coils is a balance nobody can weigh; a coil is a count taken beside the
+weight.
+
 **The second and third measures are observed, never derived.** A coil is not a
 standard weight, a bag is not reliably 25 kg, and a mesh roll is weighed rather than
 calculated — confirmed by Pratyush, who was explicit that no fixed factors exist and

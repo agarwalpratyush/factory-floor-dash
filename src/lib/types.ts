@@ -409,6 +409,24 @@ export const ALL_DEPTS = [
  */
 export const MATERIAL_CATEGORIES = ['Base Wire', 'Polymer', 'Product']
 
+/**
+ * What an article's balance is kept in. MT leads because weight is the standard;
+ * `coil` is deliberately absent - a coil is a count taken alongside the weight,
+ * not a unit a balance is held in, and holding stock in coils would mean a
+ * balance nobody can weigh.
+ */
+export const STOCK_UNITS = ['MT', 'kg', 'nos', 'roll', 'm']
+
+/** The floor's word for one pack. Counted alongside the weight, never converted. */
+export const PACK_UNITS = ['coil', 'bag', 'piece']
+
+/** The usual pack word for a category. A default offered, not a rule enforced. */
+export const PACK_BY_CATEGORY: Record<string, string> = {
+  'Base Wire': 'coil',
+  Polymer: 'bag',
+  Product: 'piece',
+}
+
 export const SHIFTS = [
   { value: 'A', label: 'Day (8 am – 8 pm)' },
   { value: 'B', label: 'Night (8 pm – 8 am)' },

@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { type PlantScope } from '../lib/plant'
 import { Button, Empty, Field, inputCls, PlantTag } from './ui'
-import { fmtDate, fmtQty, fmtWeight } from '../lib/format'
-import { MATERIAL_CATEGORIES } from '../lib/types'
+import { fmtDate, fmtQty, fmtWeight, isWeight, toStored } from '../lib/format'
+import { MATERIAL_CATEGORIES, PACK_BY_CATEGORY, PACK_UNITS, STOCK_UNITS } from '../lib/types'
 import type { StockLevel, StockRole } from '../lib/types'
 
 /**
@@ -44,8 +44,26 @@ export function AddMaterialForm({
   // database enforces the first half, so this only has to offer the second.
   const [sellable, setSellable] = useState(false)
   const [f, setF] = useState({
-    code: '', name: '', category: MATERIAL_CATEGORIES[0], unit: 'kg', opening_stock: '', reorder_level: '',
+    // MT is the standard, so it is what a new article starts on.
+    code: '', name: '', category: MATERIAL_CATEGORIES[0], unit: 'MT',
+    pack_unit: PACK_BY_CATEGORY[MATERIAL_CATEGORIES[0]] ?? '',
+    sold_by_area: false,
+    opening_stock: '', reorder_level: '',
   })
+  // Opening stock is typed in whichever unit the person has it in, like a purchase.
+  const [openingUnit, setOpeningUnit] = useState<'MT' | 'kg'>('MT')
+  const weighed = isWeight(f.unit)
+
+  /** Choosing a category sets the pack word to the usual one for it, without
+   *  locking it: the floor's word is a default, not a rule. */
+  function setCategory(category: string) {
+    setF((prev) => ({
+      ...prev,
+      category,
+      pack_unit: PACK_BY_CATEGORY[category] ?? '',
+      sold_by_area: category === 'Product' ? prev.sold_by_area : false,
+    }))
+  }
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -61,6 +79,8 @@ export function AddMaterialForm({
         name: f.name.trim(),
         category: f.category,
         unit: f.unit,
+        pack_unit: f.pack_unit || null,
+        sold_by_area: f.sold_by_area,
       })
       .select('id')
       .single()
@@ -69,7 +89,7 @@ export function AddMaterialForm({
       // Codes are unique across both companies, so the clash is usually with an
       // article the other one already has. Say that rather than the raw error.
       setErr(makeErr.code === '23505'
-        ? 'That code is already taken \u2014 possibly at the other company. Codes are unique across both, so pick another.'
+        ? 'That code is already taken — possibly at the other company. Codes are unique across both, so pick another.'
         : makeErr.message)
       return
     }
@@ -80,9 +100,13 @@ export function AddMaterialForm({
       plant_id: plantId,
       role,
       sellable: role === 'finished' ? true : sellable,
-      opening_stock: src.opening_stock ? Number(src.opening_stock) : 0,
+      opening_stock: src.opening_stock
+        ? (weighed ? toStored(Number(src.opening_stock), openingUnit, f.unit) : Number(src.opening_stock))
+        : 0,
       // Only raw materials get reordered; the rest are produced to demand.
-      reorder_level: role === 'raw' && src.reorder_level ? Number(src.reorder_level) : 0,
+      reorder_level: role === 'raw' && src.reorder_level
+        ? (weighed ? toStored(Number(src.reorder_level), openingUnit, f.unit) : Number(src.reorder_level))
+        : 0,
     })
     setBusy(false)
     if (error) setErr(error.message)
@@ -98,14 +122,20 @@ export function AddMaterialForm({
             <Field label="Name *">
               <input required value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} className={inputCls} placeholder="GI Wire Roll 4.00 mm" />
             </Field>
-            <Field label="Unit">
+            <Field label="Kept in">
               <select value={f.unit} onChange={(e) => setF({ ...f, unit: e.target.value })} className={inputCls}>
-                {['kg', 'MT', 'nos', 'm', 'roll', 'coil'].map((u) => <option key={u} value={u}>{u}</option>)}
+                {STOCK_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
               </select>
             </Field>
             <Field label="Category">
-              <select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} className={inputCls}>
+              <select value={f.category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
                 {MATERIAL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Counted in">
+              <select value={f.pack_unit} onChange={(e) => setF({ ...f, pack_unit: e.target.value })} className={inputCls}>
+                <option value="">not counted</option>
+                {PACK_UNITS.map((u) => <option key={u} value={u}>{u}s</option>)}
               </select>
             </Field>
         <Field label="What is it here? *">
@@ -116,12 +146,26 @@ export function AddMaterialForm({
           </select>
         </Field>
         <Field label="Opening stock">
-          <input
-            type="number" step="0.001"
-            value={f.opening_stock}
-            onChange={(e) => setF({ ...f, opening_stock: e.target.value })}
-            className={inputCls}
-          />
+          <div className="flex gap-2">
+            <input
+              type="number" step="0.001"
+              value={f.opening_stock}
+              onChange={(e) => setF({ ...f, opening_stock: e.target.value })}
+              className={inputCls}
+            />
+            {weighed ? (
+              <select
+                value={openingUnit}
+                onChange={(e) => setOpeningUnit(e.target.value as 'MT' | 'kg')}
+                className="rounded-lg border border-slate-300 px-2 text-sm"
+              >
+                <option value="MT">MT</option>
+                <option value="kg">kg</option>
+              </select>
+            ) : (
+              <span className="flex items-center px-2 text-sm text-slate-500">{f.unit}</span>
+            )}
+          </div>
         </Field>
         {role === 'raw' && (
           <Field label="Reorder level">
@@ -137,6 +181,21 @@ export function AddMaterialForm({
 
       <p className="text-xs text-slate-500">{ROLE_HINT[role]}</p>
 
+      {f.category === 'Product' && (
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={f.sold_by_area}
+            onChange={(e) => setF({ ...f, sold_by_area: e.target.checked })}
+            className="h-4 w-4 rounded"
+          />
+          Also measured in square metres
+          <span className="text-xs text-slate-500">
+            — mesh, gabion boxes and mattresses, which are quoted by area as well as by weight
+          </span>
+        </label>
+      )}
+
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input
           type="checkbox"
@@ -148,8 +207,8 @@ export function AddMaterialForm({
         Can be sold to a customer
         <span className="text-xs text-slate-500">
           {role === 'finished'
-            ? '\u2014 always, for a finished article'
-            : '\u2014 tick for something half-made that is also sold as it stands, like a mesh roll'}
+            ? '— always, for a finished article'
+            : '— tick for something half-made that is also sold as it stands, like a mesh roll'}
         </span>
       </label>
       {err && <p className="text-sm text-red-600">{err}</p>}
