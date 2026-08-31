@@ -46,11 +46,16 @@ export interface Material {
 
 /** What an article IS at a given company. The same article can be finished goods at
  *  one plant and raw material at another — PVC coated wire is exactly that. */
-export type StockRole = 'raw' | 'wip' | 'finished'
+/**
+ * No work in progress is held. Something half-made that is also sold - a mesh roll -
+ * is `finished` and `sellable`; that it is also woven into a box is a fact about its
+ * movements, not about the article. The `ff_stock_role` enum still has the value in
+ * Postgres, because a used enum value cannot simply be dropped, but nothing writes it.
+ */
+export type StockRole = 'raw' | 'finished'
 
 export const STOCK_ROLE_LABEL: Record<StockRole, string> = {
   raw: 'Raw material',
-  wip: 'Work in progress',
   finished: 'Finished goods',
 }
 
@@ -69,8 +74,8 @@ export interface StockLevel {
   /** Mesh and mesh products, which are sold by area as well as by weight. */
   sold_by_area: boolean
   role: StockRole
-  /** May go out to a customer. Always true for a finished article; a wip one opts
-   *  in, which is how a mesh roll can be both consumed here and sold as it stands. */
+  /** May go out to a customer. Always true for a finished article, which since
+   *  work in progress was dropped is everything that is made here. */
   sellable: boolean
   unit: string
   spec: Record<string, unknown>

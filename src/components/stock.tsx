@@ -15,7 +15,6 @@ import type { StockLevel, StockRole } from '../lib/types'
 
 export const ROLE_HINT: Record<StockRole, string> = {
   raw: 'Bought in or received, then consumed here. These are the ones with reorder levels.',
-  wip: 'Made here and then consumed here. Never bought, never sold.',
   finished: 'Made here and sold or transferred out. Not reordered — produced to demand.',
 }
 
@@ -33,9 +32,8 @@ export function AddMaterialForm({
   plantId, allowedRoles, onDone,
 }: {
   plantId: number
-  /** Which roles this page is allowed to create. Raw Material owns raw and wip;
-   *  Stock owns finished. Offering all three from both would let the same article
-   *  be filed under two pages. */
+  /** Which roles this page is allowed to create. Raw Material owns raw; Stock owns
+   *  finished. Offering both from either would let one article be filed twice. */
   allowedRoles: StockRole[]
   onDone: () => void
 }) {
@@ -126,7 +124,6 @@ export function AddMaterialForm({
         <Field label="What is it here? *">
           <select value={role} onChange={(e) => setRole(e.target.value as StockRole)} className={inputCls}>
             {allowedRoles.includes('raw') && <option value="raw">Raw material — bought in, consumed here</option>}
-            {allowedRoles.includes('wip') && <option value="wip">Work in progress — made here, consumed here</option>}
             {allowedRoles.includes('finished') && <option value="finished">Finished goods — made here, sold out</option>}
           </select>
         </Field>
@@ -247,7 +244,7 @@ export function RoleTable({
             ) : (
               <>
                 <th className="pb-2 text-right font-medium">Made</th>
-                <th className="pb-2 text-right font-medium">{role === 'wip' ? 'Consumed' : 'Sent out'}</th>
+                <th className="pb-2 text-right font-medium">Used</th>
               </>
             )}
             <th className="pb-2 text-right font-medium">Balance</th>
@@ -286,7 +283,12 @@ export function RoleTable({
                   <>
                     <td className="py-2 text-right tabular-nums text-green-700">+{fmtWeight(s.produced, s.unit)}</td>
                     <td className="py-2 text-right tabular-nums text-amber-700">
-                      −{fmtWeight(role === 'wip' ? s.consumed : s.sent_out, s.unit)}
+                      −{fmtWeight(Number(s.sent_out) + Number(s.consumed), s.unit)}
+                      {Number(s.consumed) > 0 && Number(s.sent_out) > 0 && (
+                        <span className="block text-xs font-normal text-slate-400">
+                          {fmtWeight(s.consumed, s.unit)} used here
+                        </span>
+                      )}
                     </td>
                   </>
                 )}
@@ -294,11 +296,22 @@ export function RoleTable({
                   {fmtWeight(s.balance, s.unit)}
                   {(Number(s.packs_seen) > 0 || Number(s.opening_packs) > 0 || Number(s.sqm_seen) > 0 || s.sold_by_area) && (
                     <div className="text-xs font-normal text-slate-500">
-                      {(Number(s.packs_seen) > 0 || Number(s.opening_packs) > 0) && (
-                        <span title={Number(s.packs_seen) + ' of ' + s.movements + ' movements counted'}>
-                          {fmtQty(s.packs_balance)} {s.pack_unit}s
-                        </span>
-                      )}
+                      {(Number(s.packs_seen) > 0 || Number(s.opening_packs) > 0) && (() => {
+                        // A count that has stood still while stock moved is the
+                        // opening figure, not a balance. Say which it is, or the
+                        // two numbers on this row look like they disagree.
+                        const stale = Number(s.packs_seen) === 0 && Number(s.movements) > 0
+                        return (
+                          <span
+                            className={stale ? 'text-slate-400' : undefined}
+                            title={stale
+                              ? 'None of the ' + s.movements + ' movements was counted, so this is the opening figure'
+                              : Number(s.packs_seen) + ' of ' + s.movements + ' movements counted'}
+                          >
+                            {fmtQty(s.packs_balance)} {s.pack_unit}s{stale ? ' at opening' : ''}
+                          </span>
+                        )
+                      })()}
                       {(Number(s.packs_seen) > 0 || Number(s.opening_packs) > 0) && (Number(s.sqm_seen) > 0 || s.sold_by_area) && ' · '}
                       {Number(s.sqm_seen) > 0 ? (
                         <span title={Number(s.sqm_seen) + ' of ' + s.movements + ' movements measured'}>

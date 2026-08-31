@@ -20,7 +20,7 @@ import type { Direction, MaterialTxn, Order, StockLevel, StockRole, TxnType } fr
  * These articles are deliberately absent from Stock, which carries finished goods.
  * An article belongs to one page, so nobody has to ask which balance is the real one.
  */
-const HELD_HERE: StockRole[] = ['raw', 'wip']
+const HELD_HERE: StockRole[] = ['raw']
 
 const TXN_TONE: Record<TxnType, 'green' | 'amber' | 'blue' | 'violet' | 'slate' | 'cyan'> = {
   purchase: 'green', production_in: 'cyan', transfer_in: 'blue', return_in: 'slate',

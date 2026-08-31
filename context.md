@@ -142,6 +142,16 @@ no *Packing* or *Other* to file a stray into — an escape-hatch category is how
 list like that fills back up. Adding a category is one line and should follow a
 real article rather than precede one.
 
+**There is no work in progress.** The three mesh rolls were the only articles ever
+in it and always an awkward fit — made here, sometimes woven into a box, sometimes
+sold as they stand. They are `finished` and `sellable` now; that they are also
+consumed here is a fact about their movements, not about the article, and their
+`production_out` history is untouched. The finished table's out column is therefore
+*Used*, covering what was sent out **and** what was consumed here, or a mesh roll
+woven into a box would have vanished from the page that owns it. The `ff_stock_role`
+enum still carries `wip` because a used enum value cannot simply be dropped; nothing
+writes it, and `StockRole` in TypeScript is `raw | finished`.
+
 **What an article IS and whether it may be SOLD are separate facts.** A DT mesh
 roll is made to go into a gabion box *and* sold as it stands; one `role` per
 (material, plant) could not say both, and the effect was that no mesh roll could be
