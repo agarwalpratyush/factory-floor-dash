@@ -517,6 +517,23 @@ appears on none after. A boolean cannot say that, so the Attendance page filters
 it from `left_on` — two flags kept in step by hand always drift apart. Rejoining
 clears the date and nothing else: same code, same wage, every day still theirs.
 
+**One person's record is a separate question from today's register**, and it lists
+every date in the period, not every row in the table. `ff_attendance` holds a row
+only for a day somebody answered, so a record read straight off it would skip the
+unmarked days silently and the reader would take what remained for the whole story.
+`AttendanceRecord` lays out the calendar and fills it in, so a day with no row reads
+**not marked** — counted apart from absent, because nobody answered for it and
+absent is an answer.
+
+The period is trimmed to the person's own dates, then widened back to cover any day
+actually recorded against them. Trimming alone would have hidden real days: a
+joining date typed later than a day already marked is not hypothetical — it is in
+the data now. Where the profile and the register disagree the register wins, because
+the day was marked and marking it is the record, and the sheet says so on its face
+rather than resolving it quietly. Print emits only the sheet (`#ff-print`, guarded
+by `:has()` so every other page still prints entire); the CSV is written from the
+same day list, so the paper, the spreadsheet and the screen cannot disagree.
+
 **Adding and editing a worker live on the two header buttons, `+` and the pencil**,
 not on the attendance rows. A row is for marking somebody present; an Edit button on
 every one of them put a rarely-used control in the busiest place on the page.

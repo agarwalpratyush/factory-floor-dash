@@ -155,6 +155,22 @@ input, select, textarea { font-size: 16px; }
   table { break-inside: auto; }
   tr { break-inside: avoid; }
   a { color: var(--text); text-decoration: none; }
+
+  /* A page carrying #ff-print is offering one thing to print - one person's
+     attendance record - and the surrounding page is not part of it. Hiding by
+     visibility rather than display keeps the element's own layout intact, and
+     the :has() guard means every other page still prints entire. */
+  body:has(#ff-print) * { visibility: hidden; }
+  body:has(#ff-print) #ff-print,
+  body:has(#ff-print) #ff-print * { visibility: visible; }
+  body:has(#ff-print) #ff-print {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+  /* Widths set for a phone would otherwise force a scaled-down sheet on paper. */
+  body:has(#ff-print) #ff-print table { min-width: 0 !important; }
 }
 
 /* One turn of the refresh arrow. A remount is instant and silent, so without

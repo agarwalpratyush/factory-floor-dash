@@ -12,6 +12,7 @@ import {
   ALL_DEPTS, ATTENDANCE_LABEL, DEPTS_BY_PLANT, DEPT_GROUPING_MIN, DESIGNATIONS, SHIFTS,
 } from '../lib/types'
 import type { Attendance as Att, AttendanceStatus, DailyLabour, Worker } from '../lib/types'
+import { AttendanceRecord } from '../components/AttendanceRecord'
 
 /** Present or absent is the whole question on a floor this size, and five buttons
  *  on every row made it look harder than it is. Half day, leave and week off remain
@@ -447,6 +448,9 @@ export default function Attendance() {
   // Whose day is waiting on a second press before it is cleared, because clearing
   // it would take a remark or hours down with it.
   const [confirmClear, setConfirmClear] = useState<number | null>(null)
+  // Whose whole record is open below. Null is the resting state - the register is
+  // the day's job, and one person's history is a separate question.
+  const [recordFor, setRecordFor] = useState<number | null>(null)
 
   const day = useQuery(() => loadDay(scope, date), 'att-' + scopeKey(scope) + '-' + date)
   const month = useQuery(() => loadMonth(daysAgo(29)), 'att-month')
@@ -469,6 +473,15 @@ export default function Attendance() {
     }
     return m
   }, [month.data])
+
+  /** The card sits below the roll, so a click on a row would otherwise change
+   *  something off-screen and read as a click that did nothing. */
+  function openRecord(id: number) {
+    setRecordFor(id)
+    requestAnimationFrame(() => {
+      document.getElementById('ff-record')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  }
 
   /** Which site a roving person worked at. Group staff only appear in Combined View,
    *  so the site always comes from the picker on their row. */
@@ -607,6 +620,10 @@ export default function Attendance() {
   // one offering them back.
   const departed = day.data?.departed ?? []
 
+  // Everyone whose record can be pulled, which includes people who have left:
+  // theirs is often the one being asked for - a last month, a settlement.
+  const roster = [...workers, ...departed].sort((a, b) => a.name.localeCompare(b.name))
+
   const labour = day.data?.labour ?? []
   const casual = labour.reduce((s, l) => s + Number(l.head_count), 0)
   const casualCost = labour.reduce((s, l) => s + Number(l.head_count) * Number(l.rate_per_head ?? 0), 0)
@@ -661,6 +678,14 @@ export default function Attendance() {
           <div className="text-xs text-slate-500">
             {w.code}
             {stat && ' · ' + fmtNum(stat.present, 1) + 'd present /30'}
+            {' · '}
+            <button
+              onClick={() => openRecord(w.id)}
+              className="underline decoration-dotted underline-offset-2 hover:text-slate-900"
+              title={'Every day of a chosen period for ' + w.name}
+            >
+              record
+            </button>
           </div>
           {w.notes && <div className="text-xs text-amber-700">{w.notes}</div>}
           {cur?.remarks && <div className="text-xs text-slate-600">“{cur.remarks}”</div>}
@@ -1075,6 +1100,19 @@ export default function Attendance() {
           </div>
         )}
       </Card>
+
+      {/* The register answers "who is in today". This answers "what did one person
+          do over a stretch", which is the question a settlement or a dispute asks. */}
+      <div id="ff-record">
+        <Card title="One person's record">
+          <AttendanceRecord
+            roster={roster}
+            workerId={recordFor}
+            onPick={setRecordFor}
+            money={money}
+          />
+        </Card>
+      </div>
 
       {/* Everything paid by the day, in one place: the hands we know by name and
           mark individually, then the lots we only count. */}
