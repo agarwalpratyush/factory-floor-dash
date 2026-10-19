@@ -68,7 +68,7 @@ function EntryForm({
   const [f, setF] = useState({
     txn_date: today(), material_id: '', qty: '', unit_rate: '',
     party: '', ref_no: '', order_id: '', remarks: '',
-    packs: '', sqm: '',
+    packs: '',
   })
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -98,9 +98,7 @@ function EntryForm({
       qty: weighed && mat ? toStored(Number(f.qty), entryUnit, mat.unit) : Number(f.qty),
       // Counted, not converted. Blank means nobody counted, which is not zero.
       qty_packs: f.packs ? Number(f.packs) : null,
-      // Left null on purpose: nothing computes it yet, and a hand-typed area
-      // would have to be unpicked once the formula arrives.
-      qty_sqm: null,
+      // Not sent: a trigger works it out from the count and the article's size.
       unit_rate: f.unit_rate ? Number(f.unit_rate) : null,
       party: f.party.trim() || null,
       ref_no: f.ref_no.trim() || null,
@@ -111,7 +109,7 @@ function EntryForm({
     setBusy(false)
     if (error) { setErr(error.message); return }
     setOk(true)
-    setF({ ...f, qty: '', unit_rate: '', ref_no: '', remarks: '', packs: '', sqm: '' })
+    setF({ ...f, qty: '', unit_rate: '', ref_no: '', remarks: '', packs: '' })
     onDone()
   }
 
@@ -175,13 +173,16 @@ function EntryForm({
             />
           </Field>
         )}
-        {/* Square metres are not asked for. They will be worked out from the
-             article's size once the formulas are settled; typing them now would
-             produce numbers the formula later contradicts. */}
+        {/* Square metres are never typed. The database works them out from the
+             count and the article's size, so this only shows what it will save. */}
         {mat?.sold_by_area && (
           <Field label="Square metres">
             <div className={inputCls + ' bg-slate-50 text-slate-500'}>
-              worked out from the size
+              {mat.unit_sqm === null
+                ? 'size needed on the article'
+                : f.packs
+                  ? fmtQty(Number(f.packs) * mat.unit_sqm) + ' sqm'
+                  : fmtQty(mat.unit_sqm) + ' sqm each'}
             </div>
           </Field>
         )}

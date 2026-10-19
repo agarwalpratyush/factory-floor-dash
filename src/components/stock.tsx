@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { type PlantScope } from '../lib/plant'
 import { Button, Empty, Field, inputCls, PlantTag } from './ui'
@@ -30,6 +30,28 @@ export const ROLE_HINT: Record<StockRole, string> = {
  */
 /** Quoted by the square metre as well as by weight: everything woven. */
 const AREA_CATEGORIES = ['Gabion Box', 'Rolls', 'Mattress']
+
+/** The sizes an area is worked out from, kept in `ff_materials.spec` under these
+ *  keys. `ff_unit_sqm` in the database holds the formulas and reads the same keys. */
+const SIZE_FIELDS: Record<string, { key: string; label: string; hint?: string }[]> = {
+  Rolls: [
+    { key: 'width_m', label: 'Roll width (m)' },
+    { key: 'roll_m', label: 'Roll length (m)' },
+  ],
+  'Gabion Box': [
+    { key: 'len_m', label: 'Length (m)' },
+    { key: 'wid_m', label: 'Width (m)' },
+    { key: 'ht_m', label: 'Height (m)' },
+    { key: 'diaphragms', label: 'Diaphragms', hint: 'auto' },
+  ],
+  Mattress: [
+    { key: 'len_m', label: 'Length (m)' },
+    { key: 'wid_m', label: 'Width (m)' },
+    { key: 'ht_m', label: 'Height (m)' },
+    { key: 'diaphragms', label: 'Diaphragms', hint: 'auto' },
+  ],
+}
+const SIZE_KEYS = [...new Set(Object.values(SIZE_FIELDS).flat().map((s) => s.key))]
 
 /** Drawn to a diameter, so a size means something. A gabion box has dimensions
  *  but not a gauge, which is a different question and not this one. */
@@ -92,6 +114,38 @@ export function ArticleForm({
   const [reorderIn, setReorderIn] = useState<'weight' | 'packs'>(
     article && Number(article.reorder_packs) > 0 ? 'packs' : 'weight',
   )
+  // What one piece measures, for an article sold by area. Held as typed; the
+  // formula that turns it into square metres lives in the database alone.
+  const [size, setSize] = useState<Record<string, string>>(() => Object.fromEntries(
+    SIZE_KEYS.map((k) => [k, str(article?.spec?.[k] as number | undefined)]),
+  ))
+  const [unitSqm, setUnitSqm] = useState<number | null>(article?.unit_sqm ?? null)
+  const sizeFields = f.sold_by_area ? SIZE_FIELDS[f.category] ?? [] : []
+
+  /** The article's spec with this category's sizes written in. Anything else
+   *  already in it is kept; a size left blank is taken out, not saved as zero. */
+  function specWithSize() {
+    const spec: Record<string, unknown> = { ...(article?.spec ?? {}) }
+    for (const k of SIZE_KEYS) delete spec[k]
+    for (const { key } of sizeFields) if (size[key] !== '') spec[key] = Number(size[key])
+    return spec
+  }
+
+  // Ask the database what one piece comes to, so the form and every balance
+  // answer from the same formula rather than from two copies of it.
+  const hasSize = sizeFields.length > 0
+  const specKey = JSON.stringify(specWithSize())
+  useEffect(() => {
+    if (!hasSize) return
+    let live = true
+    const t = setTimeout(async () => {
+      const { data } = await supabase.rpc('ff_unit_sqm', { p_category: f.category, p_spec: JSON.parse(specKey) })
+      if (live) setUnitSqm(data === null ? null : Number(data))
+    }, 250)
+    return () => { live = false; clearTimeout(t) }
+  }, [f.category, specKey, hasSize])
+  const shownSqm = hasSize ? unitSqm : null
+
   // The sizes and what a coil may vary from them, opened on request.
   const [tolOpen, setTolOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -122,6 +176,8 @@ export function ArticleForm({
       od_tol_minus: f.od_tol_minus ? Number(f.od_tol_minus) : null,
       od_tol_plus: f.od_tol_plus ? Number(f.od_tol_plus) : null,
       sold_by_area: f.sold_by_area,
+      // Only a woven article's sizes are this form's to change.
+      spec: AREA_CATEGORIES.includes(f.category) ? specWithSize() : article?.spec ?? {},
     }
   }
 
@@ -312,6 +368,32 @@ export function ArticleForm({
             — mesh, gabion boxes and mattresses, which are quoted by area as well as by weight
           </span>
         </label>
+      )}
+
+      {hasSize && (
+        <div className="rounded-lg bg-slate-50 p-3 ring-1 ring-slate-200">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {sizeFields.map(({ key, label, hint }) => (
+              <Field key={key} label={label}>
+                <input
+                  type="number" min="0" step={key === 'diaphragms' ? 1 : 0.01}
+                  value={size[key]}
+                  onChange={(e) => setSize({ ...size, [key]: e.target.value })}
+                  className={inputCls}
+                  placeholder={hint}
+                  title={key === 'diaphragms'
+                    ? 'Left blank: one per metre of length after the first'
+                    : undefined}
+                />
+              </Field>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-slate-600">
+            {shownSqm !== null
+              ? <>One {PACK_BY_CATEGORY[f.category] ?? 'piece'} is <strong>{fmtQty(shownSqm)} sqm</strong> of finished mesh{f.category !== 'Rolls' && ', diaphragms included'}. Every movement is worked out from its count.</>
+              : 'Fill in the size and the square metres are worked out on every movement.'}
+          </p>
+        </div>
       )}
 
       {role !== 'finished' && (
@@ -534,13 +616,17 @@ export function RoleTable({
                         )
                       })()}
                       {(Number(s.packs_seen) > 0 || Number(s.opening_packs) > 0) && (Number(s.sqm_seen) > 0 || s.sold_by_area) && ' · '}
-                      {Number(s.sqm_seen) > 0 ? (
+                      {s.unit_sqm !== null ? (
+                        <span title={fmtQty(s.unit_sqm) + ' sqm each · ' + s.sqm_seen + ' of ' + s.movements + ' movements measured'}>
+                          {fmtQty(s.sqm_balance)} sqm
+                        </span>
+                      ) : Number(s.sqm_seen) > 0 ? (
                         <span title={Number(s.sqm_seen) + ' of ' + s.movements + ' movements measured'}>
                           {fmtQty(s.sqm_balance)} sqm
                         </span>
                       ) : s.sold_by_area && (
-                        <span className="text-slate-400" title="Worked out from the article's size once the formula is set">
-                          sqm pending
+                        <span className="text-slate-400" title="Edit the article and fill in its size to work out square metres">
+                          size needed
                         </span>
                       )}
                     </div>

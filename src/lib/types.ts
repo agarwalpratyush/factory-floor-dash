@@ -119,6 +119,9 @@ export interface StockLevel {
   sqm_seen: number
   movements: number
   last_movement: string | null
+  /** Square metres in one piece, worked out by `ff_unit_sqm` from `spec`. Null
+   *  when the article is not sold by area or its size is not filled in. */
+  unit_sqm: number | null
 }
 
 export interface MaterialTxn {

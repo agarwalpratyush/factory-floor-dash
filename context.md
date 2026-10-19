@@ -148,29 +148,51 @@ one question. Setting either clears the other: `reorder_level` goes to 0 and
 `reorder_packs` to null. Whichever measure is watched is the one that flags the
 article low.
 
-**Square metres are not entered at all — they will be calculated.** Pratyush has the
-formulas and will supply them when Agarwal work resumes; until then the entry form
-shows *worked out from the size* where the field would be, and an article with
-`sold_by_area` reads *sqm pending* on its balance. `ff_material_txns.qty_sqm` exists
-and nothing writes it. **Do not invent an area formula, and do not restore the input:**
-a hand-typed area would have to be unpicked the day the real one lands. `ff_materials.spec`
-already carries the dimensions it will need. The open question to put to him is whether
-a gabion box's quoted area counts the diaphragms.
+**Square metres are never typed — they are worked out from the size and the count.**
+The formulas are the *finished* mesh area from the owner's gabion design app
+(`gabion-formulas.txt` there), and live in exactly one place, `ff_unit_sqm(category, spec)`:
 
-**The second and third measures are observed, never derived.** A coil is not a
-standard weight, a bag is not reliably 25 kg, and a mesh roll is weighed rather than
-calculated — confirmed by Pratyush, who was explicit that no fixed factors exist and
-that the numbers will accumulate as people enter them. So `ff_material_txns` carries
-`qty_packs`, `qty_weight_kg` and `qty_sqm`, all nullable, none convertible to `qty`
-or to each other. **Do not add a kg-per-coil or sqm-per-piece constant.** When
-enough real pairs exist, an average can be computed from them; a typed constant
-would be a guess that outlives its author.
+| Category | One piece, in sqm | Sizes in `ff_materials.spec` |
+|---|---|---|
+| Rolls (DT mesh, rockfall) | `W × L` | `width_m`, `roll_m` |
+| Gabion Box | `L·2(W+H) + W·H·(2+n)` | `len_m`, `wid_m`, `ht_m`, `diaphragms` |
+| Mattress | `(L+2H)(W+2H) + L·W + n·W·H` | same |
+
+`n` is `diaphragms` when set, else one per metre after the first, `floor(L) − 1`. A
+gabion box's quoted area **does** count its diaphragms — that was the open question,
+and the formula answers it. Not the design app's *cut* area: that adds fold allowances
+and drives weight, which is a different question with no fixed answer.
+
+A BEFORE trigger on `ff_material_txns` sets `qty_sqm = qty_packs × ff_unit_sqm(...)`
+on every insert and update, whatever the client sent, so purchases, dispatches and
+transfers all get it without each RPC knowing. Articles still kept in pieces use `qty`
+when there is no count. **No count, no square metres** — a weight is never converted.
+Production does not record a count yet, so a production movement carries no area and
+the balance's *n of m measured* says so. Editing an article's size, category or
+`sold_by_area` re-works every movement already recorded (`ff_resync_txn_sqm`, security
+definer so the editor needs no rights on the ledger). `ff_stock_levels.sqm_balance`
+includes the opening count × area and exposes `unit_sqm`; an article sold by area with
+no size reads *size needed*. The article form sends the sizes and asks the database
+for the per-piece figure rather than carrying a second copy of the formula.
+
+**Changing a formula means changing `ff_unit_sqm` only**, then
+`update ff_material_txns set qty_sqm = qty_sqm` to re-work history.
+
+**The second and third measures are observed, never derived — square metres apart.**
+A coil is not a standard weight, a bag is not reliably 25 kg, and a mesh roll is
+weighed rather than calculated — confirmed by Pratyush, who was explicit that no fixed
+factors exist and that the numbers will accumulate as people enter them. So
+`ff_material_txns` carries `qty_packs`, `qty_weight_kg` and `qty_sqm`, all nullable,
+none convertible to `qty`. **Do not add a kg-per-coil or kg-per-sqm constant.** Square
+metres are the one exception, and only because they are geometry from the article's
+own size, not a factor anyone typed. When enough real weight pairs exist, an average
+can be computed from them; a typed constant would be a guess that outlives its author.
 
 `qty` remains the single number stock arithmetic runs on, so a balance can never
 contradict itself. The observed measures net alongside it and are reported with a
 count of how many movements actually carried each — a partial total must never read
 as a full one. `ff_materials.pack_unit` supplies the floor's word (coil, bag,
-piece); `sold_by_area` decides whether square metres are asked for at all.
+piece); `sold_by_area` decides whether square metres are worked out at all.
 
 **A page offers only the categories that company can have.** `CATEGORIES_FOR` is
 keyed on `ff_plants.processes` and the role, never on a plant code — the same rule
