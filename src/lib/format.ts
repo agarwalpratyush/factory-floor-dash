@@ -129,3 +129,7 @@ export const daysAgo = (n: number) => {
   d.setDate(d.getDate() - n)
   return ymd(d)
 }
+
+/** How the floor writes a box's diaphragms: (1/d). Nothing when there are none. */
+export const diaphragmTag = (n: number | null | undefined) =>
+  n !== null && n !== undefined && Number(n) > 0 ? ' (' + n + '/d)' : ''

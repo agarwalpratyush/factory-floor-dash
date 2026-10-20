@@ -158,7 +158,10 @@ The formulas are the *finished* mesh area from the owner's gabion design app
 | Gabion Box | `L·2(W+H) + W·H·(2+n)` | `len_m`, `wid_m`, `ht_m`, `diaphragms` |
 | Mattress | `(L+2H)(W+2H) + L·W + n·W·H` | same |
 
-`n` is `diaphragms` when set, else one per metre after the first, `floor(L) − 1`. A
+`n` is `diaphragms` when set, else one per metre after the first, `floor(L) − 1` —
+worked out by `ff_diaphragms`, which the area uses and `ff_stock_levels.diaphragms`
+exposes. Any article with diaphragms is written the floor's way, **code (n/d)**, e.g.
+`GB-2X1X1 (1/d)`, on the stock table and every article picker (`diaphragmTag`). A
 gabion box's quoted area **does** count its diaphragms — that was the open question,
 and the formula answers it. Not the design app's *cut* area: that adds fold allowances
 and drives weight, which is a different question with no fixed answer.

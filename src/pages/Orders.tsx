@@ -4,7 +4,7 @@ import { useQuery } from '../lib/useQuery'
 import { Badge, Button, Card, Empty, ErrorBox, Field, inputCls, NeedPlant, PlantTag, Spinner, STAGE_TONE } from '../components/ui'
 import { usePlant, scopeKey, type PlantScope } from '../lib/plant'
 import { useAuth } from '../lib/auth'
-import { fmtDate, fmtMoney, fmtQty, today } from '../lib/format'
+import { diaphragmTag, fmtDate, fmtMoney, fmtQty, today } from '../lib/format'
 import { ORDER_STAGES, STAGE_LABEL } from '../lib/types'
 import type { OrderItem, OrderProgress, OrderStage, StockLevel } from '../lib/types'
 
@@ -86,7 +86,7 @@ function AddItemForm({ orderId, sellable, onDone }: {
           <option value="">Not on our list — describe it</option>
           {sellable.map((m) => (
             <option key={m.material_id} value={m.material_id}>
-              {m.code} — {m.name} ({fmtQty(m.balance)} {m.unit} on hand)
+              {m.code}{diaphragmTag(m.diaphragms)} — {m.name} ({fmtQty(m.balance)} {m.unit} on hand)
             </option>
           ))}
         </select>

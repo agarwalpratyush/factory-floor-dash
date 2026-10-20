@@ -8,7 +8,7 @@ import {
   NeedPlant, PlantTag, Spinner, Stat,
 } from '../components/ui'
 import { CoilDetail, CoilEntryGrid, type CoilLogSummary } from '../components/CoilLog'
-import { daysAgo, fmtDate, fmtNum, fmtQty, today } from '../lib/format'
+import { diaphragmTag, daysAgo, fmtDate, fmtNum, fmtQty, today } from '../lib/format'
 import { SHIFTS } from '../lib/types'
 import type { Order, Production as Prod, StockLevel } from '../lib/types'
 
@@ -123,7 +123,7 @@ function RunForm({
         <Field label="Made *">
           <select required value={f.output_material_id} onChange={(e) => setF({ ...f, output_material_id: e.target.value })} className={inputCls}>
             <option value="">Select…</option>
-            {outputs.map((s) => <option key={s.material_id} value={s.material_id}>{s.code} — {s.name}</option>)}
+            {outputs.map((s) => <option key={s.material_id} value={s.material_id}>{s.code}{diaphragmTag(s.diaphragms)} — {s.name}</option>)}
           </select>
         </Field>
         <Field label={'Quantity made *' + (outMat ? ' (' + outMat.unit + ')' : '')}>
@@ -148,7 +148,7 @@ function RunForm({
                     <option value="">Select material…</option>
                     {stock.map((s) => (
                       <option key={s.material_id} value={s.material_id}>
-                        {s.code} — {s.name} ({fmtQty(s.balance)} {s.unit} in stock)
+                        {s.code}{diaphragmTag(s.diaphragms)} — {s.name} ({fmtQty(s.balance)} {s.unit} in stock)
                       </option>
                     ))}
                   </select>

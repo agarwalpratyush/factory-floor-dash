@@ -8,7 +8,7 @@ import {
   NeedPlant, PlantTag, Spinner, Stat,
 } from '../components/ui'
 import { ArticleForm, ROLE_HINT, RoleTable } from '../components/stock'
-import { daysAgo, fmtDate, fmtNum, fmtQty, fmtWeight, isWeight, toStored, today } from '../lib/format'
+import { diaphragmTag, daysAgo, fmtDate, fmtNum, fmtQty, fmtWeight, isWeight, toStored, today } from '../lib/format'
 import { MATERIAL_CATEGORIES, STOCK_ROLE_LABEL, TXN_TYPE_LABEL, categoriesFor } from '../lib/types'
 import type { Direction, MaterialTxn, Order, StockLevel, StockRole, TxnType } from '../lib/types'
 
@@ -130,7 +130,7 @@ function EntryForm({
             <option value="">Select…</option>
             {stock.map((m) => (
               <option key={m.plant_id + '-' + m.material_id} value={m.material_id}>
-                {m.code} — {m.name} ({fmtWeight(m.balance, m.unit)})
+                {m.code}{diaphragmTag(m.diaphragms)} — {m.name} ({fmtWeight(m.balance, m.unit)})
               </option>
             ))}
           </select>

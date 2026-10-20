@@ -122,6 +122,9 @@ export interface StockLevel {
   /** Square metres in one piece, worked out by `ff_unit_sqm` from `spec`. Null
    *  when the article is not sold by area or its size is not filled in. */
   unit_sqm: number | null
+  /** Diaphragms in one box or mattress, from `ff_diaphragms`: as specified, else
+   *  one per metre after the first. Shown as (n/d) when there are any. */
+  diaphragms: number | null
 }
 
 export interface MaterialTxn {

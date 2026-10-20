@@ -7,7 +7,7 @@ import {
   Badge, Button, Card, Empty, ErrorBox, Field, inputCls,
   NeedPlant, PlantTag, Spinner, Stat,
 } from '../components/ui'
-import { daysAgo, fmtDate, fmtQty, fmtWeight, today } from '../lib/format'
+import { diaphragmTag, daysAgo, fmtDate, fmtQty, fmtWeight, today } from '../lib/format'
 import type {
   Dispatch as Load, DispatchStatus, Order, OutwardKind, Plant, StockLevel, Worker,
 } from '../lib/types'
@@ -237,7 +237,7 @@ function OutwardForm({
                     <option value="">{kind === 'customer' ? 'Select an article…' : 'Select material…'}</option>
                     {sendable.map((s) => (
                       <option key={s.material_id} value={s.material_id}>
-                        {s.code} — {s.name} ({fmtWeight(s.balance, s.unit)} on hand)
+                        {s.code}{diaphragmTag(s.diaphragms)} — {s.name} ({fmtWeight(s.balance, s.unit)} on hand)
                       </option>
                     ))}
                   </select>

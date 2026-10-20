@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { type PlantScope } from '../lib/plant'
 import { Button, Empty, Field, inputCls, PlantTag } from './ui'
-import { fmtDate, fmtQty, fmtWeight, toStored } from '../lib/format'
+import { diaphragmTag, fmtDate, fmtQty, fmtWeight, toStored } from '../lib/format'
 import { PACK_BY_CATEGORY, PACK_LABEL, STOCK_UNIT } from '../lib/types'
 import type { StockLevel, StockRole } from '../lib/types'
 
@@ -120,6 +120,7 @@ export function ArticleForm({
     SIZE_KEYS.map((k) => [k, str(article?.spec?.[k] as number | undefined)]),
   ))
   const [unitSqm, setUnitSqm] = useState<number | null>(article?.unit_sqm ?? null)
+  const [diaphragms, setDiaphragms] = useState<number | null>(article?.diaphragms ?? null)
   const sizeFields = f.sold_by_area ? SIZE_FIELDS[f.category] ?? [] : []
 
   /** The article's spec with this category's sizes written in. Anything else
@@ -139,8 +140,14 @@ export function ArticleForm({
     if (!hasSize) return
     let live = true
     const t = setTimeout(async () => {
-      const { data } = await supabase.rpc('ff_unit_sqm', { p_category: f.category, p_spec: JSON.parse(specKey) })
-      if (live) setUnitSqm(data === null ? null : Number(data))
+      const args = { p_category: f.category, p_spec: JSON.parse(specKey) }
+      const [area, d] = await Promise.all([
+        supabase.rpc('ff_unit_sqm', args),
+        supabase.rpc('ff_diaphragms', args),
+      ])
+      if (!live) return
+      setUnitSqm(area.data === null ? null : Number(area.data))
+      setDiaphragms(d.data === null ? null : Number(d.data))
     }, 250)
     return () => { live = false; clearTimeout(t) }
   }, [f.category, specKey, hasSize])
@@ -390,7 +397,7 @@ export function ArticleForm({
           </div>
           <p className="mt-2 text-xs text-slate-600">
             {shownSqm !== null
-              ? <>One {PACK_BY_CATEGORY[f.category] ?? 'piece'} is <strong>{fmtQty(shownSqm)} sqm</strong> of finished mesh{f.category !== 'Rolls' && ', diaphragms included'}. Every movement is worked out from its count.</>
+              ? <>One {PACK_BY_CATEGORY[f.category] ?? 'piece'} is <strong>{fmtQty(shownSqm)} sqm{diaphragmTag(diaphragms)}</strong> of finished mesh{f.category !== 'Rolls' && ', diaphragms included'}. Every movement is worked out from its count.</>
               : 'Fill in the size and the square metres are worked out on every movement.'}
           </p>
         </div>
@@ -563,7 +570,14 @@ export function RoleTable({
               <tr key={keyOf(s)} className={neg ? 'bg-red-50/60' : low ? 'bg-amber-50/50' : 'hover:bg-slate-50'}>
                 {scope === 'group' && <td className="py-2"><PlantTag code={s.plant_code} /></td>}
                 <td className="py-2">
-                  <div className="font-medium text-slate-900">{s.code}</div>
+                  <div className="font-medium text-slate-900">
+                    {s.code}
+                    {diaphragmTag(s.diaphragms) && (
+                      <span className="font-normal text-slate-500" title={s.diaphragms + ' diaphragm' + (Number(s.diaphragms) === 1 ? '' : 's')}>
+                        {diaphragmTag(s.diaphragms)}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-xs text-slate-500">{s.name}</div>
                 </td>
                 <td className="py-2 text-right tabular-nums text-slate-500">
